@@ -1,0 +1,6 @@
+pydicom
+Pillow
+tqdm
+requests
+numpy
+pandas
