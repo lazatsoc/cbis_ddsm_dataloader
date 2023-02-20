@@ -1,5 +1,5 @@
 {
-  "download_path" : "/media/lazaros-main/e130a823-548e-4dcc-a2ee-dfd058d75a04/CBIS_DDSM/",
+  "download_path" : "./CBIS_DDSM/",
   "manifest" : "./resources/CBIS-DDSM-All-doiJNLP-zzWs5zfZ.tcia",
   "mass_train_csv": "./resources/mass_case_description_train_set.csv",
   "mass_test_csv": "./resources/mass_case_description_test_set.csv",
