@@ -10,21 +10,27 @@ class CBISDDSMPreprocessor:
         self.__download_path = download_path
         self.__csv_files_train = csv_files_train
         self.__csv_files_test = csv_files_test
+        self.__not_found = 0
 
     def __locate_lesion(self, item_dict):
-        image = Image.open(os.path.join(self.__download_path, item_dict['image_path']))
-        mask = Image.open(os.path.join(self.__download_path, item_dict['mask_path']))
+        try:
+            image = Image.open(os.path.join(self.__download_path, item_dict['image_path']))
+            mask = Image.open(os.path.join(self.__download_path, item_dict['mask_path']))
+            pass
+        except FileNotFoundError:
+            self.__not_found += 1
+            return None
+        except:
+            pass
         pass
 
     def start(self):
-        print('Processing {} training abnormality csv files.'.format(len(self.__csv_files_train)))
-        columns = ["patient_id", "breast_density", "left_right", "view", "lesion_type", "type1", "type2", "assessment",
-                   "pathology", "subtlety", "image_path", "roi_path"]
+        print('Processing {} abnormality csv files for training.'.format(len(self.__csv_files_train)))
         for csv_file in self.__csv_files_train:
             # df = pandas.DataFrame(columns=columns)
             data = []
             with open(csv_file) as fin:
-                reader = csv.reader(fin, delimiter=',', quotechar='|')
+                reader = csv.reader(fin, delimiter=',', quotechar='"')
                 next(reader)
                 for row in reader:
                     item_dict = {
@@ -39,14 +45,14 @@ class CBISDDSMPreprocessor:
                         "pathology": row[9],
                         "subtlety": row[10],
                         "image_path": os.path.splitext(row[11])[0] + '.png',
-                        "mask_path": os.path.splitext(row[12])[0] + '.png'
+                        "mask_path": os.path.splitext(row[13])[0] + '.png'
                     }
                     pos_dict = self.__locate_lesion(item_dict)
+                    if pos_dict is None:
+                        continue
                     item_dict += pos_dict
-
-                    break
-        print('Processing {} testing abnormality csv files.'.format(len(self.__csv_files_test)))
-
+        print('Processing {} abnormality csv files for testing.'.format(len(self.__csv_files_test)))
+        print('Could not locate {} files. Please re-run the downloader.'.format(self.__not_found))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='CBIS DDSM Preprocessor')

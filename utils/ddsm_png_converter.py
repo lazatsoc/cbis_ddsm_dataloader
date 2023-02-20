@@ -7,37 +7,55 @@ import argparse
 
 
 class CBISDDSMConverter:
-    def __init__(self, download_path, skip_existing=True):
+    def __init__(self, download_path, skip_existing=True, delete_dcm=False):
         self.__download_path = download_path
         self.__skip_existing = skip_existing
+        self.__delete_dcm = delete_dcm
         self.__dcm_image_list = []
         self.__num_skipped = 0
 
     def __find_images(self, root_path):
         directory_list = os.listdir(root_path)
         for dir in directory_list:
-            dir_path = os.path.join(root_path, dir)
-            contents_list = os.listdir(dir_path)
-            dcm_list = list(item for item in contents_list if item.endswith('.dcm'))
-            png_list = list(item for item in contents_list if item.endswith('.png'))
-            if self.__skip_existing and len(dcm_list) == len(png_list):
-                self.__num_skipped += len(dcm_list)
-                continue
-            for img in dcm_list:
-                img_path = os.path.join(dir_path, img)
-                self.__dcm_image_list.append(img_path)
-        print("Skipped {} dcm images.".format(self.__num_skipped))
-        print("Found {} dcm images to convert.".format(len(self.__dcm_image_list)))
+            dir_path_1 = os.path.join(root_path, dir)
+            directory_list_1 = os.listdir(dir_path_1)
+            for dir_1 in directory_list_1:
+                dir_path_2 = os.path.join(dir_path_1, dir_1)
+                directory_list_2 = os.listdir(dir_path_2)
+                for dir_2 in directory_list_2:
+                    dir_path = os.path.join(dir_path_2, dir_2)
+                    contents_list = os.listdir(dir_path)
+                    dcm_list = list(item for item in contents_list if item.endswith('.dcm'))
+                    png_list = list(item for item in contents_list if item.endswith('.png'))
+                    if self.__skip_existing and len(dcm_list) == len(png_list):
+                        self.__num_skipped += len(dcm_list)
+                        continue
+                    for img in dcm_list:
+                        img_path = os.path.join(dir_path, img)
+                        self.__dcm_image_list.append(img_path)
+        print("Found {} dcm images to convert. Skipped {}.".format(len(self.__dcm_image_list), self.__num_skipped))
 
-    def __dicom_to_png(self, input_path, output_path):
+    @staticmethod
+    def __get_png_path(dcm_path):
+        path, name_ext = os.path.split(dcm_path)
+        name, _ = os.path.splitext(name_ext)
+        name_int = int(name) - 1  # Start numbering from 0
+        name = str(name_int).zfill(6)
+        output_path = os.path.join(path, name + '.png')
+        return output_path
+
+    @staticmethod
+    def __dicom_to_png(input_path, output_path):
         ds = pydicom.dcmread(input_path, force=True)
         pixel_array = ds.pixel_array
         image = Image.fromarray(pixel_array)
         image.save(output_path, format='PNG', lossless=True)
 
     def __payload(self, input_path):
-        output_path = input_path[:-4] + '.png'
+        output_path = self.__get_png_path(input_path)
         self.__dicom_to_png(input_path, output_path)
+        if self.__delete_dcm:
+            os.remove(input_path)
 
     def start(self):
         self.__find_images(self.__download_path)
@@ -64,5 +82,5 @@ if __name__ == "__main__":
     parser.add_argument('-p', '--path', default='../CBIS_DDSM',
                         help='Path to the download folder. It will be created if not existing.')
     args = parser.parse_args()
-    downloader = CBISDDSMConverter(args.path)
+    downloader = CBISDDSMConverter(args.path, delete_dcm=True)
     downloader.start()

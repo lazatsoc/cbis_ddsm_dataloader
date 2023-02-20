@@ -33,12 +33,14 @@ class CBISDDSMDownloader:
             else:
                 print("Incorrect format of the manifest file provided!")
 
-    def __get_metadata(self, series_uid):
+    @staticmethod
+    def __get_metadata(series_uid):
         response = requests.get(BASE_URL_METADATA.format(series_uid))
         response_dict = json.loads(response.content.decode("utf-8"))[0]
         return response_dict
 
-    def __exists(self, download_path, num_imgs):
+    @staticmethod
+    def __exists(download_path, num_imgs):
         if os.path.exists(download_path):
             folder_contents = os.listdir(download_path)
             num_dcm = len(list(item for item in folder_contents if item.endswith('.dcm')))
@@ -46,7 +48,8 @@ class CBISDDSMDownloader:
                 return True
         return False
 
-    def __download_extract_image(self, series_uid, path):
+    @staticmethod
+    def __download_extract_image(series_uid, path):
         response = requests.get(BASE_URL_IMAGE.format(series_uid))
         with zipfile.ZipFile(BytesIO(response.content)) as z:
             z.extractall(path)
@@ -54,8 +57,10 @@ class CBISDDSMDownloader:
     def __payload(self, seriesUID):
         metadata = self.__get_metadata(seriesUID)
         folder_name = metadata['Subject ID']
+        series_uid = metadata['Series UID']
+        study_uid = metadata['Study UID']
         num_imgs = int(metadata['Number of Images'])
-        download_path = os.path.join(self.__download_path, folder_name)
+        download_path = os.path.join(self.__download_path, folder_name, study_uid, series_uid)
 
         if self.__skip_existing and self.__exists(download_path, num_imgs):
             return
