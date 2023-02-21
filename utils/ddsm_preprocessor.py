@@ -82,6 +82,7 @@ class CBISDDSMPreprocessor:
         if self.__not_found > 0:
             print('Could not locate {} files. Please re-run the downloader.'.format(self.__not_found))
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='CBIS DDSM Preprocessor')
     parser.add_argument('-p', '--path', default='../CBIS_DDSM',
