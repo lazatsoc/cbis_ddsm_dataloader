@@ -20,14 +20,14 @@ args = parser.parse_args()
 with open(args.config_file, 'r') as cf:
     config = json.load(cf)
 
-downloader = CBISDDSMDownloader(config['manifest'], config['download_path'])
-downloader.start()
+# downloader = CBISDDSMDownloader(config['manifest'], config['download_path'])
+# downloader.start()
+#
+# converter = CBISDDSMConverter(config['download_path'])
+# converter.start()
 
-converter = CBISDDSMConverter(config['download_path'])
-converter.start()
-
-# preprocessor = CBISDDSMPreprocessor(config['download_path'],
-#                                     (config['mass_train_csv'], config['calc_train_csv']),
-#                                     (config['mass_test_csv'], config['calc_test_csv']))
-# preprocessor.start()
+preprocessor = CBISDDSMPreprocessor(config['download_path'],
+                                    (config['mass_train_csv'], config['calc_train_csv']),
+                                    (config['mass_test_csv'], config['calc_test_csv']))
+preprocessor.start()
 pass

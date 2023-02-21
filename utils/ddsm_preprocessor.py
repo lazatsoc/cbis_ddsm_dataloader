@@ -2,6 +2,7 @@ import csv
 import argparse
 import os
 from PIL import Image
+import numpy as np
 import pandas
 
 
@@ -11,23 +12,39 @@ class CBISDDSMPreprocessor:
         self.__csv_files_train = csv_files_train
         self.__csv_files_test = csv_files_test
         self.__not_found = 0
+        self.__other_errors = 0
 
     def __locate_lesion(self, item_dict):
         try:
             image = Image.open(os.path.join(self.__download_path, item_dict['image_path']))
-            mask = Image.open(os.path.join(self.__download_path, item_dict['mask_path']))
-            pass
+            mask_img = Image.open(os.path.join(self.__download_path, item_dict['mask_path']))
+            if image.size != mask_img.size:
+                tmp = item_dict['mask_path']
+                item_dict['mask_path'] = item_dict['patch_path']
+                item_dict['patch_path'] = tmp
+                mask_img = Image.open(os.path.join(self.__download_path, item_dict['mask_path']))
+            mask = np.array(mask_img)
+            ys, xs = np.where(mask)
+            item_dict['minx'] = xs.min().tolist()
+            item_dict['maxx'] = xs.max().tolist()
+            item_dict['miny'] = ys.min().tolist()
+            item_dict['maxy'] = ys.max().tolist()
+            item_dict['cx'] = int((item_dict['maxx'] - item_dict['minx']) / 2)
+            item_dict['cy'] = int((item_dict['maxy'] - item_dict['miny']) / 2)
+
         except FileNotFoundError:
             self.__not_found += 1
-            return None
-        except:
-            pass
-        pass
+            return False
+        except Exception as e:
+            print(f"Patient {item_dict['patient_id']} generated an exception: {e}")
+            self.__other_errors += 1
+            return False
+
+        return True
 
     def start(self):
         print('Processing {} abnormality csv files for training.'.format(len(self.__csv_files_train)))
         for csv_file in self.__csv_files_train:
-            # df = pandas.DataFrame(columns=columns)
             data = []
             with open(csv_file) as fin:
                 reader = csv.reader(fin, delimiter=',', quotechar='"')
@@ -45,12 +62,18 @@ class CBISDDSMPreprocessor:
                         "pathology": row[9],
                         "subtlety": row[10],
                         "image_path": os.path.splitext(row[11])[0] + '.png',
+                        "patch_path": os.path.splitext(row[12])[0] + '.png',
                         "mask_path": os.path.splitext(row[13])[0] + '.png'
                     }
-                    pos_dict = self.__locate_lesion(item_dict)
-                    if pos_dict is None:
+                    result = self.__locate_lesion(item_dict)
+                    if not result:
                         continue
-                    item_dict += pos_dict
+
+                    data.append(item_dict)
+                df = pandas.DataFrame(data)
+                df.to_csv(os.path.join(self.__download_path, 'lesions.csv'))
+                pass
+
         print('Processing {} abnormality csv files for testing.'.format(len(self.__csv_files_test)))
         print('Could not locate {} files. Please re-run the downloader.'.format(self.__not_found))
 
