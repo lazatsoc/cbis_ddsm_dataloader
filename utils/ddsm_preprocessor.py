@@ -42,10 +42,9 @@ class CBISDDSMPreprocessor:
 
         return True
 
-    def start(self):
-        print('Processing {} abnormality csv files for training.'.format(len(self.__csv_files_train)))
-        for csv_file in self.__csv_files_train:
-            data = []
+    def __parse_file(self, file_list, out_csv_path):
+        data = []
+        for csv_file in file_list:
             with open(csv_file) as fin:
                 reader = csv.reader(fin, delimiter=',', quotechar='"')
                 next(reader)
@@ -70,12 +69,18 @@ class CBISDDSMPreprocessor:
                         continue
 
                     data.append(item_dict)
-                df = pandas.DataFrame(data)
-                df.to_csv(os.path.join(self.__download_path, 'lesions.csv'))
-                pass
+            df = pandas.DataFrame(data)
+            df.to_csv(out_csv_path)
 
-        print('Processing {} abnormality csv files for testing.'.format(len(self.__csv_files_test)))
-        print('Could not locate {} files. Please re-run the downloader.'.format(self.__not_found))
+    def start(self):
+        print('Processing {} abnormality csv files for training.'.format(len(self.__csv_files_train)))
+        self.__parse_file(self.__csv_files_train ,os.path.join(self.__download_path, 'lesions_train.csv'))
+
+        print('Processing {} abnormality csv files for testing.'.format(len(self.__csv_files_train)))
+        self.__parse_file(self.__csv_files_test, os.path.join(self.__download_path, 'lesions_test.csv'))
+
+        if self.__not_found > 0:
+            print('Could not locate {} files. Please re-run the downloader.'.format(self.__not_found))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='CBIS DDSM Preprocessor')
