@@ -69,12 +69,13 @@ class CBISDDSMPreprocessor:
                         continue
 
                     data.append(item_dict)
-            df = pandas.DataFrame(data)
-            df.to_csv(out_csv_path)
+
+        df = pandas.DataFrame(data)
+        df.to_csv(out_csv_path)
 
     def start(self):
         print('Processing {} abnormality csv files for training.'.format(len(self.__csv_files_train)))
-        self.__parse_file(self.__csv_files_train ,os.path.join(self.__download_path, 'lesions_train.csv'))
+        self.__parse_file(self.__csv_files_train, os.path.join(self.__download_path, 'lesions_train.csv'))
 
         print('Processing {} abnormality csv files for testing.'.format(len(self.__csv_files_train)))
         self.__parse_file(self.__csv_files_test, os.path.join(self.__download_path, 'lesions_test.csv'))
