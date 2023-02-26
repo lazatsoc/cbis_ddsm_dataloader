@@ -2,3 +2,4 @@ CBIS_DDSM
 .idea
 config.json
 *.pyc
+venv

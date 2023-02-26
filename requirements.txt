@@ -4,3 +4,4 @@ tqdm
 requests
 numpy
 pandas
+matplotlib

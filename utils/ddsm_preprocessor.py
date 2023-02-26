@@ -29,8 +29,8 @@ class CBISDDSMPreprocessor:
             item_dict['maxx'] = xs.max().tolist()
             item_dict['miny'] = ys.min().tolist()
             item_dict['maxy'] = ys.max().tolist()
-            item_dict['cx'] = int((item_dict['maxx'] - item_dict['minx']) / 2)
-            item_dict['cy'] = int((item_dict['maxy'] - item_dict['miny']) / 2)
+            item_dict['cx'] = int((item_dict['maxx'] - item_dict['minx']) / 2 + item_dict['minx'])
+            item_dict['cy'] = int((item_dict['maxy'] - item_dict['miny']) / 2 + item_dict['miny'])
 
         except FileNotFoundError:
             self.__not_found += 1
