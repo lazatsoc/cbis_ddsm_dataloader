@@ -2,8 +2,8 @@ import json
 import os.path
 import pandas as pd
 from typing import List, Dict, Tuple
-
-from datasets.ddsm_dataset import CBISDDSMCenteredPatchesDataset
+from transforms.patch_transforms import centered_patch_transform
+from datasets.classification_dataset import CBISDDSMClassificationDataset
 
 
 class CBISDDSMDatasetFactory:
@@ -15,7 +15,7 @@ class CBISDDSMDatasetFactory:
         self.__excluded_attrs: List[str] = []
         self.__excluded_values: Dict[str, set] = {'lesion_type': {'mass', 'calcification'}}
         self.__attribute_mapped_values: Dict[str, Dict[str, str]] = {}
-        # self.__patch_transform
+        self.__transform = None
 
     @staticmethod
     def __read_config(config_path):
@@ -89,12 +89,13 @@ class CBISDDSMDatasetFactory:
         return self
 
     def patches_centered(self, shape: Tuple[int] = (1024, 1024)):
-        pass
+        self.__transform = centered_patch_transform(shape)
+        return self
 
     def create_classification(self, attribute):
         self.__fetch_filter_lesions()
         label_list = self.__dataframe[attribute].unique().tolist()
-        return CBISDDSMCenteredPatchesDataset(self.__dataframe, self.__config['download_path'], attribute, label_list)
+        return CBISDDSMClassificationDataset(self.__dataframe, self.__config['download_path'], attribute, label_list, transform=self.__transform)
 
 
 if __name__ == "__main__":
@@ -104,6 +105,7 @@ if __name__ == "__main__":
         .drop_attributes("assessment", "breast_density", "subtlety") \
         .map_attribute_value('pathology', {'BENIGN_WITHOUT_CALLBACK': 'BENIGN'}) \
         .show_counts() \
+        .patches_centered() \
         .create_classification('pathology')
     dataset.visualize()
     pass
