@@ -2,7 +2,7 @@ import json
 import os.path
 import pandas as pd
 from typing import List, Dict, Tuple
-from transforms.patch_transforms import centered_patch_transform
+from transforms.patch_transforms import centered_patch_transform, random_patch_transform
 from datasets.classification_dataset import CBISDDSMClassificationDataset
 
 
@@ -92,6 +92,10 @@ class CBISDDSMDatasetFactory:
         self.__transform = centered_patch_transform(shape)
         return self
 
+    def patches_random(self, shape: Tuple[int] = (1024, 1024), min_overlap=0.9):
+        self.__transform = random_patch_transform(shape, min_overlap)
+        return self
+
     def create_classification(self, attribute):
         self.__fetch_filter_lesions()
         label_list = self.__dataframe[attribute].unique().tolist()
@@ -105,7 +109,7 @@ if __name__ == "__main__":
         .drop_attributes("assessment", "breast_density", "subtlety") \
         .map_attribute_value('pathology', {'BENIGN_WITHOUT_CALLBACK': 'BENIGN'}) \
         .show_counts() \
-        .patches_centered() \
+        .patches_random() \
         .create_classification('pathology')
     dataset.visualize()
     pass

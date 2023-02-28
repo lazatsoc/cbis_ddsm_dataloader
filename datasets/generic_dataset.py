@@ -1,4 +1,6 @@
 import os
+from typing import Any, Tuple
+
 from torch.utils.data import Dataset
 from PIL import Image
 import numpy as np
@@ -22,7 +24,7 @@ class CBISDDSMGenericDataset(Dataset):
         image_tensor = torch.from_numpy(image_arr)
 
         if self.transform is not None:
-            image_tensor, item = self.transform(image_tensor, item)
+            image_tensor, item = self.transform((image_tensor,), item)
 
         return image_tensor, item
 
@@ -30,7 +32,7 @@ class CBISDDSMGenericDataset(Dataset):
         return len(self.dataframe.index)
 
     def _get_img_visualize(self, image):
-        return image.squeeze()
+        return image[0].squeeze()
 
     def _get_label_visualize(self, item):
         return f'{item["patient_id"]}_{item["left_right"]}_{item["view"]}'
