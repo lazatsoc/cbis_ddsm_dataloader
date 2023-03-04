@@ -1,6 +1,8 @@
 import csv
 import argparse
 import os
+
+import cv2
 from PIL import Image
 import numpy as np
 import pandas
@@ -14,32 +16,34 @@ class CBISDDSMPreprocessor:
         self.__not_found = 0
         self.__other_errors = 0
 
-    def __locate_lesion(self, item_dict):
-        try:
-            image = Image.open(os.path.join(self.__download_path, item_dict['image_path']))
-            mask_img = Image.open(os.path.join(self.__download_path, item_dict['mask_path']))
-            if image.size != mask_img.size:
-                tmp = item_dict['mask_path']
-                item_dict['mask_path'] = item_dict['patch_path']
-                item_dict['patch_path'] = tmp
-                mask_img = Image.open(os.path.join(self.__download_path, item_dict['mask_path']))
-            mask = np.array(mask_img)
-            ys, xs = np.where(mask)
-            item_dict['minx'] = xs.min().tolist()
-            item_dict['maxx'] = xs.max().tolist()
-            item_dict['miny'] = ys.min().tolist()
-            item_dict['maxy'] = ys.max().tolist()
-            item_dict['cx'] = int((item_dict['maxx'] - item_dict['minx']) / 2 + item_dict['minx'])
-            item_dict['cy'] = int((item_dict['maxy'] - item_dict['miny']) / 2 + item_dict['miny'])
+    @staticmethod
+    def __locate_lesion(mask_img, item_dict):
+        mask = np.array(mask_img)
+        ys, xs = np.where(mask)
+        item_dict['minx'] = xs.min().tolist()
+        item_dict['maxx'] = xs.max().tolist()
+        item_dict['miny'] = ys.min().tolist()
+        item_dict['maxy'] = ys.max().tolist()
+        item_dict['cx'] = int((item_dict['maxx'] - item_dict['minx']) / 2 + item_dict['minx'])
+        item_dict['cy'] = int((item_dict['maxy'] - item_dict['miny']) / 2 + item_dict['miny'])
 
-        except FileNotFoundError:
-            self.__not_found += 1
-            return False
-        except Exception as e:
-            print(f"Patient {item_dict['patient_id']} generated an exception: {e}")
-            self.__other_errors += 1
-            return False
+        return True
 
+    @staticmethod
+    def __locate_breast(image, item_dict):
+        image = (np.array(image) / 255).astype(np.uint8)
+        threshold = int(0.05 * image.max())
+        _, image_binary = cv2.threshold(image, threshold, 255, cv2.THRESH_BINARY)
+        contours, _ = cv2.findContours(image_binary, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        contours_areas = [cv2.contourArea(cont) for cont in contours]
+        biggest_contour_idx = np.argmax(contours_areas)
+        breast_contour = contours[biggest_contour_idx]
+        item_dict['breast_minx'] = breast_contour[:, 0, 0].min()
+        item_dict['breast_maxx'] = breast_contour[:, 0, 0].max()
+        item_dict['breast_miny'] = breast_contour[:, 0, 1].min()
+        item_dict['breast_maxy'] = breast_contour[:, 0, 1].max()
+        item_dict['breast_cx'] = int((item_dict['breast_maxx'] - item_dict['breast_minx']) / 2 + item_dict['breast_minx'])
+        item_dict['breast_cy'] = int((item_dict['breast_maxy'] - item_dict['breast_miny']) / 2 + item_dict['breast_miny'])
         return True
 
     def __parse_file(self, file_list, out_csv_path):
@@ -64,7 +68,29 @@ class CBISDDSMPreprocessor:
                         "patch_path": os.path.splitext(row[12])[0] + '.png',
                         "mask_path": os.path.splitext(row[13])[0] + '.png'
                     }
-                    result = self.__locate_lesion(item_dict)
+                    try:
+                        image = Image.open(os.path.join(self.__download_path, item_dict['image_path']))
+                        mask_img = Image.open(os.path.join(self.__download_path, item_dict['mask_path']))
+                        if image.size != mask_img.size:
+                            tmp = item_dict['mask_path']
+                            item_dict['mask_path'] = item_dict['patch_path']
+                            item_dict['patch_path'] = tmp
+                            mask_img = Image.open(os.path.join(self.__download_path, item_dict['mask_path']))
+                    except FileNotFoundError:
+                        self.__not_found += 1
+                        continue
+                    except Exception as e:
+                        print(f"Patient {item_dict['patient_id']} generated an exception: {e}")
+                        self.__other_errors += 1
+                        continue
+
+                    result = self.__locate_lesion(mask_img, item_dict)
+
+                    if not result:
+                        continue
+
+                    result = self.__locate_breast(image, item_dict)
+
                     if not result:
                         continue
 

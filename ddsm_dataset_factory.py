@@ -2,7 +2,10 @@ import json
 import os.path
 import pandas as pd
 from typing import List, Dict, Tuple
-from transforms.patch_transforms import centered_patch_transform, random_patch_transform
+
+from torchvision.transforms import Compose
+
+from transforms.patch_transforms import centered_patch_transform, random_patch_transform, normal_transform_wrapper
 from datasets.classification_dataset import CBISDDSMClassificationDataset
 
 
@@ -15,7 +18,8 @@ class CBISDDSMDatasetFactory:
         self.__excluded_attrs: List[str] = []
         self.__excluded_values: Dict[str, set] = {'lesion_type': {'mass', 'calcification'}}
         self.__attribute_mapped_values: Dict[str, Dict[str, str]] = {}
-        self.__transform = None
+        self.__transform_list = []
+        self.__plus_normal = False
 
     @staticmethod
     def __read_config(config_path):
@@ -88,18 +92,26 @@ class CBISDDSMDatasetFactory:
 
         return self
 
-    def patches_centered(self, shape: Tuple[int] = (1024, 1024)):
-        self.__transform = centered_patch_transform(shape)
+    def lesion_patches_centered(self, shape: Tuple[int] = (1024, 1024)):
+        self.__transform_list.append(centered_patch_transform(shape))
         return self
 
-    def patches_random(self, shape: Tuple[int] = (1024, 1024), min_overlap=0.9):
-        self.__transform = random_patch_transform(shape, min_overlap)
+    def lesion_patches_random(self, shape: Tuple[int] = (1024, 1024), min_overlap=0.9, normal_probability=0.0):
+
+        patch_transform = random_patch_transform(shape, min_overlap)
+        if normal_probability > 0:
+            self.__plus_normal = True
+            patch_transform = normal_transform_wrapper(patch_transform, normal_probability, shape, 1-min_overlap)
+        self.__transform_list.append(patch_transform)
         return self
 
     def create_classification(self, attribute):
         self.__fetch_filter_lesions()
         label_list = self.__dataframe[attribute].unique().tolist()
-        return CBISDDSMClassificationDataset(self.__dataframe, self.__config['download_path'], attribute, label_list, transform=self.__transform)
+        if self.__plus_normal:
+            label_list.append('NORMAL')
+        return CBISDDSMClassificationDataset(self.__dataframe, self.__config['download_path'], attribute, label_list,
+                                             transform=Compose(self.__transform_list))
 
 
 if __name__ == "__main__":
@@ -109,7 +121,7 @@ if __name__ == "__main__":
         .drop_attributes("assessment", "breast_density", "subtlety") \
         .map_attribute_value('pathology', {'BENIGN_WITHOUT_CALLBACK': 'BENIGN'}) \
         .show_counts() \
-        .patches_random() \
+        .lesion_patches_random(normal_probability=0.8) \
         .create_classification('pathology')
     dataset.visualize()
     pass

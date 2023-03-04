@@ -21,10 +21,11 @@ class CBISDDSMGenericDataset(Dataset):
         image_arr /= 65535
         image_tensor = torch.from_numpy(image_arr)
 
+        sample = {'image_tensor_list': (image_tensor,), 'item': item}
         if self.transform is not None:
-            image_tensor, item = self.transform((image_tensor,), item)
+            sample = self.transform(sample)
 
-        return image_tensor, item
+        return sample['image_tensor_list'], sample['item']
 
     def __len__(self):
         return len(self.dataframe.index)
