@@ -41,7 +41,7 @@ def normal_patch_transform_wrapper(other_tranform, probability=0.5, patch_size=(
                     break
                 counter += 1
                 if counter == 5:
-                    print('Giving up')
+                    # print('Giving up')
                     return other_tranform(sample)
 
             out_tensors = []

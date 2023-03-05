@@ -106,12 +106,13 @@ class CBISDDSMDatasetFactory:
         self.__transform_list.append(patch_transform)
         return self
 
-    def create_classification(self, attribute):
+    def create_classification(self, attribute, mask_input=False):
         self.__fetch_filter_lesions()
         label_list = self.__dataframe[attribute].unique().tolist()
         if self.__plus_normal:
             label_list.append('NORMAL')
         return CBISDDSMClassificationDataset(self.__dataframe, self.__config['download_path'], attribute, label_list,
+                                             masks=mask_input,
                                              transform=Compose(self.__transform_list))
 
 
@@ -123,6 +124,6 @@ if __name__ == "__main__":
         .map_attribute_value('pathology', {'BENIGN_WITHOUT_CALLBACK': 'BENIGN'}) \
         .show_counts() \
         .lesion_patches_random(normal_probability=0.8) \
-        .create_classification('pathology')
+        .create_classification('pathology', mask_input=True)
     dataset.visualize()
     pass
