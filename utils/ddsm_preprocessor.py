@@ -6,6 +6,9 @@ import cv2
 from PIL import Image
 import numpy as np
 import pandas
+from matplotlib import pyplot as plt
+from tqdm import tqdm
+import concurrent.futures
 
 
 class CBISDDSMPreprocessor:
@@ -38,63 +41,86 @@ class CBISDDSMPreprocessor:
         contours_areas = [cv2.contourArea(cont) for cont in contours]
         biggest_contour_idx = np.argmax(contours_areas)
         breast_contour = contours[biggest_contour_idx]
+        breast_contour = cv2.convexHull(breast_contour)
+
+        epsilon = 0.001 * cv2.arcLength(breast_contour, True)
+        approxCurve = cv2.approxPolyDP(breast_contour, epsilon, True)
+
+        # print(approxCurve.shape[0])
+        # image_binary = np.dstack([image_binary]*3)
+        # cv2.drawContours(image_binary, [approxCurve], 0, (255, 0, 0), 3)
+        # plt.imshow(image_binary, cmap='gray')
+        # plt.show()
+
         item_dict['breast_minx'] = breast_contour[:, 0, 0].min()
         item_dict['breast_maxx'] = breast_contour[:, 0, 0].max()
         item_dict['breast_miny'] = breast_contour[:, 0, 1].min()
         item_dict['breast_maxy'] = breast_contour[:, 0, 1].max()
         item_dict['breast_cx'] = int((item_dict['breast_maxx'] - item_dict['breast_minx']) / 2 + item_dict['breast_minx'])
         item_dict['breast_cy'] = int((item_dict['breast_maxy'] - item_dict['breast_miny']) / 2 + item_dict['breast_miny'])
+        item_dict['breast_poly'] = approxCurve[:, 0, :].tolist()
         return True
 
+    def __payload(self, row):
+        item_dict = {
+            "patient_id": row[0],
+            "breast_density": row[1],
+            "left_right": row[2],
+            "view": row[3],
+            "lesion_type": row[5],
+            "type1": row[6],
+            "type2": row[7],
+            "assessment": row[8],
+            "pathology": row[9],
+            "subtlety": row[10],
+            "image_path": os.path.splitext(row[11])[0] + '.png',
+            "patch_path": os.path.splitext(row[12])[0] + '.png',
+            "mask_path": os.path.splitext(row[13])[0] + '.png'
+        }
+        image = Image.open(os.path.join(self.__download_path, item_dict['image_path']))
+        mask_img = Image.open(os.path.join(self.__download_path, item_dict['mask_path']))
+        if image.size != mask_img.size:
+            tmp = item_dict['mask_path']
+            item_dict['mask_path'] = item_dict['patch_path']
+            item_dict['patch_path'] = tmp
+            mask_img = Image.open(os.path.join(self.__download_path, item_dict['mask_path']))
+
+        result = self.__locate_lesion(mask_img, item_dict)
+
+        if not result:
+            raise Exception()
+
+        result = self.__locate_breast(image, item_dict)
+
+        if not result:
+            raise Exception()
+
+        return item_dict
+
     def __parse_file(self, file_list, out_csv_path):
+        rows = []
         data = []
         for csv_file in file_list:
             with open(csv_file) as fin:
                 reader = csv.reader(fin, delimiter=',', quotechar='"')
                 next(reader)
+
                 for row in reader:
-                    item_dict = {
-                        "patient_id": row[0],
-                        "breast_density": row[1],
-                        "left_right": row[2],
-                        "view": row[3],
-                        "lesion_type": row[5],
-                        "type1": row[6],
-                        "type2": row[7],
-                        "assessment": row[8],
-                        "pathology": row[9],
-                        "subtlety": row[10],
-                        "image_path": os.path.splitext(row[11])[0] + '.png',
-                        "patch_path": os.path.splitext(row[12])[0] + '.png',
-                        "mask_path": os.path.splitext(row[13])[0] + '.png'
-                    }
-                    try:
-                        image = Image.open(os.path.join(self.__download_path, item_dict['image_path']))
-                        mask_img = Image.open(os.path.join(self.__download_path, item_dict['mask_path']))
-                        if image.size != mask_img.size:
-                            tmp = item_dict['mask_path']
-                            item_dict['mask_path'] = item_dict['patch_path']
-                            item_dict['patch_path'] = tmp
-                            mask_img = Image.open(os.path.join(self.__download_path, item_dict['mask_path']))
-                    except FileNotFoundError:
-                        self.__not_found += 1
-                        continue
-                    except Exception as e:
-                        print(f"Patient {item_dict['patient_id']} generated an exception: {e}")
-                        self.__other_errors += 1
-                        continue
+                    rows.append(row)
 
-                    result = self.__locate_lesion(mask_img, item_dict)
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future_to_row = {executor.submit(self.__payload, row): row for row in rows}
+            for future in tqdm(concurrent.futures.as_completed(future_to_row), total=len(rows), unit='abnormalities'):
+                try:
+                    item_dict = future.result()
+                except FileNotFoundError:
+                    self.__not_found += 1
+                    continue
+                except Exception as e:
+                    self.__other_errors += 1
+                    continue
 
-                    if not result:
-                        continue
-
-                    result = self.__locate_breast(image, item_dict)
-
-                    if not result:
-                        continue
-
-                    data.append(item_dict)
+                data.append(item_dict)
 
         df = pandas.DataFrame(data)
         df.to_csv(out_csv_path)

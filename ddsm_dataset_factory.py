@@ -4,8 +4,9 @@ import pandas as pd
 from typing import List, Dict, Tuple
 
 from torchvision.transforms import Compose
-
-from transforms.patch_transforms import centered_patch_transform, random_patch_transform, normal_transform_wrapper
+from transforms.patches_centered import centered_patch_transform
+from transforms.patches_random import random_patch_transform
+from transforms.patches_normal import normal_patch_transform_wrapper
 from datasets.classification_dataset import CBISDDSMClassificationDataset
 
 
@@ -101,7 +102,7 @@ class CBISDDSMDatasetFactory:
         patch_transform = random_patch_transform(shape, min_overlap)
         if normal_probability > 0:
             self.__plus_normal = True
-            patch_transform = normal_transform_wrapper(patch_transform, normal_probability, shape, 1-min_overlap)
+            patch_transform = normal_patch_transform_wrapper(patch_transform, normal_probability, shape, 1 - min_overlap)
         self.__transform_list.append(patch_transform)
         return self
 

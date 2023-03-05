@@ -6,3 +6,4 @@ numpy
 pandas
 matplotlib
 opencv-python
+shapely
