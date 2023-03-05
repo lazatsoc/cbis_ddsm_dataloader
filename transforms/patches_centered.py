@@ -39,6 +39,7 @@ def centered_patch_transform(patch_size=(1024, 1024)):
             image_tensor = image_tensor[miny: maxy, minx: maxx]
             out_tensors.append(image_tensor)
 
-        return out_tensors, item
+        sample = {'image_tensor_list': out_tensors, 'item': item}
+        return sample
 
     return perform
