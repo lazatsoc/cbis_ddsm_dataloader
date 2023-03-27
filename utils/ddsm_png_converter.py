@@ -11,13 +11,19 @@ class CBISDDSMConverter:
         self.__download_path = download_path
         self.__skip_existing = skip_existing
         self.__delete_dcm = delete_dcm
+        self.__initialize_lists()
+
+    def __initialize_lists(self):
         self.__dcm_image_list = []
+        self.__to_delete_dcm_image_list = []
         self.__num_skipped = 0
 
     def __find_images(self, root_path):
         directory_list = os.listdir(root_path)
         for dir in directory_list:
             dir_path_1 = os.path.join(root_path, dir)
+            if not os.path.isdir(dir_path_1):
+                continue
             directory_list_1 = os.listdir(dir_path_1)
             for dir_1 in directory_list_1:
                 dir_path_2 = os.path.join(dir_path_1, dir_1)
@@ -27,6 +33,10 @@ class CBISDDSMConverter:
                     contents_list = os.listdir(dir_path)
                     dcm_list = list(item for item in contents_list if item.endswith('.dcm'))
                     png_list = list(item for item in contents_list if item.endswith('.png'))
+                    if self.__delete_dcm:
+                        for img in dcm_list:
+                            img_path = os.path.join(dir_path, img)
+                            self.__to_delete_dcm_image_list.append(img_path)
                     if self.__skip_existing and len(dcm_list) == len(png_list):
                         self.__num_skipped += len(dcm_list)
                         continue
@@ -51,18 +61,20 @@ class CBISDDSMConverter:
         image = Image.fromarray(pixel_array)
         image.save(output_path, format='PNG', lossless=True)
 
-    def __payload(self, input_path):
+    def __payload_convert(self, input_path):
         output_path = self.__get_png_path(input_path)
         self.__dicom_to_png(input_path, output_path)
-        if self.__delete_dcm:
-            os.remove(input_path)
+
+    def __payload_delete(self, input_path):
+        os.remove(input_path)
 
     def start(self):
+        self.__initialize_lists()
         self.__find_images(self.__download_path)
         num_fails = 0
         with concurrent.futures.ThreadPoolExecutor() as executor:
             # Start the load operations and mark each future with its URL
-            future_to_url = {executor.submit(self.__payload, uid): uid for uid in self.__dcm_image_list}
+            future_to_url = {executor.submit(self.__payload_convert, uid): uid for uid in self.__dcm_image_list}
             for future in tqdm(concurrent.futures.as_completed(future_to_url), total=len(self.__dcm_image_list),
                                unit="file"):
                 url = future_to_url[future]
@@ -75,6 +87,23 @@ class CBISDDSMConverter:
                 print(
                     'Conversion failed for {} dcm images. Please re-run the downloader to fix incorrect downloads.'.format(
                         num_fails))
+        if self.__delete_dcm:
+            print('Cleaning up DICOM images...')
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                # Start the load operations and mark each future with its URL
+                future_to_url = {executor.submit(self.__payload_delete, uid): uid for uid in self.__to_delete_dcm_image_list}
+                for future in tqdm(concurrent.futures.as_completed(future_to_url), total=len(self.__to_delete_dcm_image_list),
+                                   unit="file"):
+                    url = future_to_url[future]
+                    try:
+                        future.result()
+                    except Exception as exc:
+                        num_fails += 1
+                        print(f"{url} generated an exception: {exc}")
+                if num_fails > 0:
+                    print(
+                        'Deletion failed for {} dcm images. Please re-run the downloader to fix incorrect downloads.'.format(
+                            num_fails))
 
 
 if __name__ == "__main__":

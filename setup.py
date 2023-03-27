@@ -22,13 +22,13 @@ args = parser.parse_args()
 with open(args.config_file, 'r') as cf:
     config = json.load(cf)
 
-# downloader = CBISDDSMDownloader(config['manifest'], config['download_path'])
-# downloader.start()
-# downloader.start()  # Run twice for checks
-#
-# converter = CBISDDSMConverter(config['download_path'], delete_dcm=args.d)
-# converter.start()
-# converter.start()  # Run twice for checks
+downloader = CBISDDSMDownloader(config['manifest'], config['download_path'])
+downloader.start()
+downloader.start()  # Run twice for checks
+
+converter = CBISDDSMConverter(config['download_path'], delete_dcm=args.d)
+converter.start()
+converter.start()  # Run twice for checks
 
 preprocessor = CBISDDSMPreprocessor(config['download_path'],
                                     (config['mass_train_csv'], config['calc_train_csv']),
