@@ -21,6 +21,7 @@ class CBISDDSMDatasetFactory:
         self.__attribute_mapped_values: Dict[str, Dict[str, str]] = {}
         self.__transform_list = []
         self.__plus_normal = False
+        self.__patch_transform_selected = False
 
     @staticmethod
     def __read_config(config_path):
@@ -95,17 +96,25 @@ class CBISDDSMDatasetFactory:
         return self
 
     def lesion_patches_centered(self, shape: Tuple[int] = (1024, 1024)):
+        if self.__patch_transform_selected:
+            raise Exception('Patch transform already selected!')
         self.__transform_list.append(centered_patch_transform(shape))
+        self.__patch_transform_selected = True
         return self
 
     def lesion_patches_random(self, shape: Tuple[int] = (1024, 1024), min_overlap=0.9, normal_probability=0.0):
-
+        if self.__patch_transform_selected:
+            raise Exception('Patch transform already selected!')
         patch_transform = random_patch_transform(shape, min_overlap)
         if normal_probability > 0:
             self.__plus_normal = True
             patch_transform = normal_patch_transform_wrapper(patch_transform, normal_probability, shape, 1 - min_overlap)
         self.__transform_list.append(patch_transform)
+        self.__patch_transform_selected = True
         return self
+
+    def add_transforms(self, transform_list: List):
+        self.__transform_list.extend(transform_list)
 
     def create_classification(self, attribute, mask_input=False):
         self.__fetch_filter_lesions()
