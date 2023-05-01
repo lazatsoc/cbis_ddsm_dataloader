@@ -20,6 +20,7 @@ class CBISDDSMDatasetFactory:
         self.__excluded_values: Dict[str, set] = {'lesion_type': {'mass', 'calcification'}}
         self.__attribute_mapped_values: Dict[str, Dict[str, str]] = {}
         self.__transform_list = []
+        self.__image_transform_list = []
         self.__plus_normal = False
         self.__patch_transform_selected = False
 
@@ -113,8 +114,9 @@ class CBISDDSMDatasetFactory:
         self.__patch_transform_selected = True
         return self
 
-    def add_transforms(self, transform_list: List):
-        self.__transform_list.extend(transform_list)
+    def add_image_transforms(self, transform_list: List):
+        self.__image_transform_list.extend(transform_list)
+        return self
 
     def create_classification(self, attribute, mask_input=False):
         self.__fetch_filter_lesions()
@@ -123,7 +125,8 @@ class CBISDDSMDatasetFactory:
             label_list.append('NORMAL')
         return CBISDDSMClassificationDataset(self.__dataframe, self.__config['download_path'], attribute, label_list,
                                              masks=mask_input,
-                                             transform=Compose(self.__transform_list))
+                                             transform=Compose(self.__transform_list),
+                                             image_transform=Compose(self.__image_transform_list))
 
 
 if __name__ == "__main__":

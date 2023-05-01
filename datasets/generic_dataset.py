@@ -7,10 +7,11 @@ from matplotlib import pyplot as plt
 
 
 class CBISDDSMGenericDataset(Dataset):
-    def __init__(self, dataframe, download_path, masks=False, transform=None):
+    def __init__(self, dataframe, download_path, masks=False, transform=None, image_tranform=None):
         self.dataframe = dataframe
         self.download_path = download_path
         self.transform = transform
+        self.image_transforms = image_tranform
         self.include_masks = masks
 
     def __getitem__(self, index):
@@ -20,6 +21,7 @@ class CBISDDSMGenericDataset(Dataset):
 
         image_arr = np.array(image).astype(np.float32)
         image_arr /= 65535
+        # image_arr = np.expand_dims(image_arr, 0)
         image_tensor = torch.from_numpy(image_arr)
 
         image_tensor_list = [image_tensor]
@@ -30,6 +32,7 @@ class CBISDDSMGenericDataset(Dataset):
 
             mask_image_arr = np.array(mask_image).astype(np.float32)
             mask_image_arr /= 255
+            # mask_image_arr = np.expand_dims(mask_image_arr, 0)
             mask_image_tensor = torch.from_numpy(mask_image_arr)
 
             image_tensor_list.append(mask_image_tensor)
@@ -38,6 +41,15 @@ class CBISDDSMGenericDataset(Dataset):
 
         if self.transform is not None:
             sample = self.transform(sample)
+
+        for i in range(len(sample['image_tensor_list'])):
+            sample['image_tensor_list'][i] = torch.unsqueeze(sample['image_tensor_list'][i], 0)
+
+        if self.image_transforms is not None:
+            state = torch.get_rng_state()
+            for i in range(len(sample['image_tensor_list'])):
+                torch.set_rng_state(state)
+                sample['image_tensor_list'][i] = self.image_transforms(sample['image_tensor_list'][i])
 
         return sample['image_tensor_list'], sample['item']
 
@@ -56,18 +68,17 @@ class CBISDDSMGenericDataset(Dataset):
         else:
             figure = plt.figure()
 
-
-
         for i in range(len(self)):
             image, item = self[i]
+
             if self.include_masks:
                 figure.add_subplot(1, 2, 1)
-                plt.imshow(self._get_img_visualize(image[0]), cmap='gray')
+                plt.imshow(self._get_img_visualize(np.squeeze(image[0])), cmap='gray')
                 plt.title(self._get_label_visualize(item), backgroundcolor='white')
                 figure.add_subplot(1, 2, 2)
-                plt.imshow(self._get_img_visualize(image[1]), cmap='gray')
+                plt.imshow(self._get_img_visualize(np.squeeze(image[1])), cmap='gray')
             else:
-                plt.imshow(self._get_img_visualize(image[0]), cmap='gray')
+                plt.imshow(self._get_img_visualize(np.squeeze(image[0])), cmap='gray')
                 plt.title(self._get_label_visualize(item), backgroundcolor='white')
 
             plt.waitforbuttonpress()
