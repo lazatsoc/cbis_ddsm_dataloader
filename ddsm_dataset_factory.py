@@ -21,8 +21,12 @@ class CBISDDSMDatasetFactory:
         self.__attribute_mapped_values: Dict[str, Dict[str, str]] = {}
         self.__transform_list = []
         self.__image_transform_list = []
+        self.__image_transform_list_applied_training = []
+        self.__image_transform_list_applied_validation = []
         self.__plus_normal = False
         self.__patch_transform_selected = False
+        self.__split_validation = False
+        self.__validation_percentage = 0.0
 
     @staticmethod
     def __read_config(config_path):
@@ -109,24 +113,58 @@ class CBISDDSMDatasetFactory:
         patch_transform = random_patch_transform(shape, min_overlap)
         if normal_probability > 0:
             self.__plus_normal = True
-            patch_transform = normal_patch_transform_wrapper(patch_transform, normal_probability, shape, 1 - min_overlap)
+            patch_transform = normal_patch_transform_wrapper(patch_transform, normal_probability, shape,
+                                                             1 - min_overlap)
         self.__transform_list.append(patch_transform)
         self.__patch_transform_selected = True
         return self
 
-    def add_image_transforms(self, transform_list: List):
+    def add_image_transforms(self, transform_list: List, for_train: bool = True, for_val: bool = True):
         self.__image_transform_list.extend(transform_list)
+        self.__image_transform_list_applied_training.extend([for_train]*len(transform_list))
+        self.__image_transform_list_applied_validation.extend([for_val]*len(transform_list))
         return self
 
-    def create_classification(self, attribute, mask_input=False):
+    def split_train_val(self, validation_percentage: float):
+        self.__split_validation = True
+        self.__validation_percentage = validation_percentage
+        return self
+
+
+    def create_classification(self, attribute: str, mask_input: bool = False):
         self.__fetch_filter_lesions()
         label_list = self.__dataframe[attribute].unique().tolist()
         if self.__plus_normal:
             label_list.append('NORMAL')
-        return CBISDDSMClassificationDataset(self.__dataframe, self.__config['download_path'], attribute, label_list,
-                                             masks=mask_input,
-                                             transform=Compose(self.__transform_list),
-                                             image_transform=Compose(self.__image_transform_list))
+
+        if self.__split_validation:
+            shuffled_dataframe = self.__dataframe.sample(frac=1)
+            num_samples = len(shuffled_dataframe.index)
+            num_validation = int(num_samples * self.__validation_percentage)
+
+            train_dataframe = shuffled_dataframe.iloc[num_validation:, :]
+            train_image_transforms = [trans for trans, ft in zip(self.__image_transform_list, self.__image_transform_list_applied_training) if ft]
+
+            train_dataset = CBISDDSMClassificationDataset(train_dataframe, self.__config['download_path'], attribute, label_list,
+                                                    masks=mask_input, transform=Compose(self.__transform_list),
+                                                    image_transform=Compose(train_image_transforms))
+
+            val_dataframe = shuffled_dataframe.iloc[:num_validation, :]
+            val_transforms = [trans for trans, fv in zip(self.__image_transform_list, self.__image_transform_list_applied_validation) if fv]
+
+            val_dataset = CBISDDSMClassificationDataset(val_dataframe, self.__config['download_path'], attribute,
+                                                          label_list,
+                                                          masks=mask_input, transform=Compose(self.__transform_list),
+                                                          image_transform=Compose(val_transforms))
+
+            return (train_dataset, val_dataset)
+        else:
+            train_dataset = CBISDDSMClassificationDataset(self.__dataframe, self.__config['download_path'], attribute,
+                                                          label_list,
+                                                          masks=mask_input, transform=Compose(self.__transform_list),
+                                                          image_transform=Compose(self.__image_transform_list))
+
+            return (train_dataset, )
 
 
 if __name__ == "__main__":

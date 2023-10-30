@@ -1,11 +1,19 @@
 from ddsm_dataset_factory import CBISDDSMDatasetFactory
+from torchvision import transforms
 
-dataset = CBISDDSMDatasetFactory('./config.json') \
+train_dataset, val_dataset = CBISDDSMDatasetFactory('./config.json') \
         .train() \
         .add_masses() \
         .drop_attributes("assessment", "breast_density", "subtlety") \
         .map_attribute_value('pathology', {'BENIGN_WITHOUT_CALLBACK': 'BENIGN'}) \
         .show_counts() \
         .lesion_patches_centered() \
+        .add_image_transforms([transforms.Resize(512)]) \
+        .add_image_transforms([transforms.RandomAffine(degrees=180, scale=(0.7, 1.5)),
+                               transforms.RandomHorizontalFlip(),
+                               transforms.RandomVerticalFlip()
+                               # transforms.Lambda(lambda x: x.repeat(3, 1, 1))
+                              ], for_val=False) \
+        .split_train_val(0.2) \
         .create_classification('pathology')
-dataset.visualize()
+val_dataset.visualize()
