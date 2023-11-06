@@ -69,16 +69,21 @@ class CBISDDSMGenericDataset(Dataset):
             figure = plt.figure()
 
         for i in range(len(self)):
-            image, item = self[i]
+            image_list, item = self[i]
+
+            image = image_list[0].transpose(0, 2)
 
             if self.include_masks:
                 figure.add_subplot(1, 2, 1)
-                plt.imshow(self._get_img_visualize(np.squeeze(image[0])), cmap='gray')
+
+                mask = image_list[1].transpose(0, 2)
+
+                plt.imshow(self._get_img_visualize(image))
                 plt.title(self._get_label_visualize(item), backgroundcolor='white')
                 figure.add_subplot(1, 2, 2)
-                plt.imshow(self._get_img_visualize(np.squeeze(image[1])), cmap='gray')
+                plt.imshow(self._get_img_visualize(mask), cmap='gray')
             else:
-                plt.imshow(self._get_img_visualize(np.squeeze(image[0])), cmap='gray')
+                plt.imshow(self._get_img_visualize(image), cmap='gray')
                 plt.title(self._get_label_visualize(item), backgroundcolor='white')
 
             plt.waitforbuttonpress()

@@ -11,9 +11,8 @@ train_dataset, val_dataset = CBISDDSMDatasetFactory('./config.json') \
         .add_image_transforms([transforms.Resize(512)]) \
         .add_image_transforms([transforms.RandomAffine(degrees=180, scale=(0.7, 1.5)),
                                transforms.RandomHorizontalFlip(),
-                               transforms.RandomVerticalFlip()
-                               # transforms.Lambda(lambda x: x.repeat(3, 1, 1))
-                              ], for_val=False) \
+                               transforms.RandomVerticalFlip()], for_val=False) \
+        .add_image_transforms([transforms.Lambda(lambda x: x.repeat(3, 1, 1))]) \
         .split_train_val(0.2) \
-        .create_classification('pathology')
+        .create_classification('pathology', mask_input=True)
 val_dataset.visualize()
