@@ -13,6 +13,7 @@ class CBISDDSMGenericDataset(Dataset):
         self.transform = transform
         self.image_transforms = image_tranform
         self.include_masks = masks
+        self.current_index = 0
 
     def __getitem__(self, index):
         item = self.dataframe.iloc[index].to_dict()
@@ -56,6 +57,18 @@ class CBISDDSMGenericDataset(Dataset):
     def __len__(self):
         return len(self.dataframe.index)
 
+    def __iter__(self):
+        self.current_index = 0
+        return self
+
+    def __next__(self):
+        if self.current_index < len(self):
+            x = self[self.current_index]
+            self.current_index += 1
+            return x
+        else:
+            raise StopIteration
+
     def _get_img_visualize(self, image):
         return image
 
@@ -68,8 +81,9 @@ class CBISDDSMGenericDataset(Dataset):
         else:
             figure = plt.figure()
 
-        for i in range(len(self)):
-            image_list, item = self[i]
+        def plot(e):
+            plt.clf()
+            image_list, item = next(self)
 
             image = image_list[0].transpose(0, 2)
 
@@ -85,5 +99,7 @@ class CBISDDSMGenericDataset(Dataset):
             else:
                 plt.imshow(self._get_img_visualize(image), cmap='gray')
                 plt.title(self._get_label_visualize(item), backgroundcolor='white')
+            plt.draw()
 
-            plt.waitforbuttonpress()
+        figure.canvas.mpl_connect('key_press_event', plot)
+        plt.show()

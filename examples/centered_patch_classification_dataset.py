@@ -15,4 +15,4 @@ train_dataset, val_dataset = CBISDDSMDatasetFactory('./config.json') \
         .add_image_transforms([transforms.Lambda(lambda x: x.repeat(3, 1, 1))]) \
         .split_train_val(0.2) \
         .create_classification('pathology', mask_input=True)
-val_dataset.visualize()
+train_dataset.visualize()
