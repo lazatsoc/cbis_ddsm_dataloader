@@ -79,7 +79,12 @@ class CBISDDSMPreprocessor:
         }
         image = Image.open(os.path.join(self.__download_path, item_dict['image_path']))
         mask_img = Image.open(os.path.join(self.__download_path, item_dict['mask_path']))
-        if image.size != mask_img.size:
+        # CBIS-DDSM has the problem that sometimes the paths of the patch and the mask are swapped, so that
+        # 'patch_path' = <path of the mask> and vice versa.
+        # This is detected by comparing the image size and the mask size.
+        # However, sometimes the mask image is a little smaller than the image regardless of whether they are swapped.
+        # So we need to check if the mask is a lot smaller as well.
+        if image.size != mask_img.size and (mask_img.size[0] < image.size[0] * 0.5 or mask_img.size[1] < image.size[1] * 0.5):
             tmp = item_dict['mask_path']
             item_dict['mask_path'] = item_dict['patch_path']
             item_dict['patch_path'] = tmp
