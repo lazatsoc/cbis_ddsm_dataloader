@@ -1,7 +1,7 @@
 def centered_patch_transform(patch_size=(1024, 1024)):
     def perform(sample):
         image_tensor_list, item = sample['image_tensor_list'], sample['item']
-        image_shape = image_tensor_list[1].shape
+        image_shape = image_tensor_list[-1].shape[1:3]
 
         cx = item['cx']
         cy = item['cy']
@@ -36,7 +36,7 @@ def centered_patch_transform(patch_size=(1024, 1024)):
 
         out_tensors = []
         for image_tensor in image_tensor_list:
-            image_tensor = image_tensor[miny: maxy, minx: maxx]
+            image_tensor = image_tensor[:, miny: maxy, minx: maxx]
             out_tensors.append(image_tensor)
 
         sample = {'image_tensor_list': out_tensors, 'item': item}

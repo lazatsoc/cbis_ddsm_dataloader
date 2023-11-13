@@ -1,9 +1,11 @@
 import os
 from torch.utils.data import Dataset
-from PIL import Image
+from PIL import Image, ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True  # Workaround found in: https://stackoverflow.com/questions/42462431/oserror-broken-data-stream-when-reading-image-file
 import numpy as np
 import torch
 from matplotlib import pyplot as plt
+from torchvision.transforms import functional as F
 
 
 class CBISDDSMGenericDataset(Dataset):
@@ -19,32 +21,21 @@ class CBISDDSMGenericDataset(Dataset):
         item = self.dataframe.iloc[index].to_dict()
         img_path = os.path.join(self.download_path, item['image_path'])
         image = Image.open(img_path)
-
-        image_arr = np.array(image).astype(np.float32)
-        image_arr /= 65535
-        # image_arr = np.expand_dims(image_arr, 0)
-        image_tensor = torch.from_numpy(image_arr)
-
+        image_tensor = F.pil_to_tensor(image).float()
+        image_tensor /= 65535
         image_tensor_list = [image_tensor]
 
         if self.include_masks:
             mask_img_path = os.path.join(self.download_path, item['mask_path'])
             mask_image = Image.open(mask_img_path)
-
-            mask_image_arr = np.array(mask_image).astype(np.float32)
-            mask_image_arr /= 255
-            # mask_image_arr = np.expand_dims(mask_image_arr, 0)
-            mask_image_tensor = torch.from_numpy(mask_image_arr)
-
+            mask_image_tensor = F.pil_to_tensor(mask_image).float()
+            mask_image_tensor /= 255
             image_tensor_list.append(mask_image_tensor)
 
         sample = {'image_tensor_list': image_tensor_list, 'item': item}
 
         if self.transform is not None:
             sample = self.transform(sample)
-
-        for i in range(len(sample['image_tensor_list'])):
-            sample['image_tensor_list'][i] = torch.unsqueeze(sample['image_tensor_list'][i], 0)
 
         if self.image_transforms is not None:
             state = torch.get_rng_state()
