@@ -9,13 +9,17 @@ from torchvision.transforms import functional as F
 
 
 class CBISDDSMGenericDataset(Dataset):
-    def __init__(self, dataframe, download_path, masks=False, transform=None, image_tranform=None):
+    def __init__(self, dataframe, download_path, masks=False, transform=None, train_image_tranform=None, test_image_tranform=None):
         self.dataframe = dataframe
         self.download_path = download_path
         self.transform = transform
-        self.image_transforms = image_tranform
         self.include_masks = masks
         self.current_index = 0
+        self.__train_mode = False
+        self.__test_mode = False
+        self.__train_image_transforms = train_image_tranform
+        self.__test_image_transforms = test_image_tranform
+
 
     def __getitem__(self, index):
         item = self.dataframe.iloc[index].to_dict()
@@ -37,11 +41,16 @@ class CBISDDSMGenericDataset(Dataset):
         if self.transform is not None:
             sample = self.transform(sample)
 
-        if self.image_transforms is not None:
+        if self.__train_mode and self.__train_image_transforms is not None:
             state = torch.get_rng_state()
             for i in range(len(sample['image_tensor_list'])):
                 torch.set_rng_state(state)
-                sample['image_tensor_list'][i] = self.image_transforms(sample['image_tensor_list'][i])
+                sample['image_tensor_list'][i] = self.__train_image_transforms(sample['image_tensor_list'][i])
+        elif self.__test_mode and self.__test_image_transforms is not None:
+            state = torch.get_rng_state()
+            for i in range(len(sample['image_tensor_list'])):
+                torch.set_rng_state(state)
+                sample['image_tensor_list'][i] = self.__test_image_transforms(sample['image_tensor_list'][i])
 
         return sample['image_tensor_list'], sample['item']
 
@@ -65,6 +74,16 @@ class CBISDDSMGenericDataset(Dataset):
 
     def _get_label_visualize(self, item):
         return f'{item["patient_id"]}_{item["left_right"]}_{item["view"]}'
+
+    def train_mode(self):
+        self.__train_mode = True
+        self.__test_mode = False
+        return self
+
+    def test_mode(self):
+        self.__train_mode = False
+        self.__test_mode = True
+        return self
 
     def visualize(self):
         if self.include_masks:
