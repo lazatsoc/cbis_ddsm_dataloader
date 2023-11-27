@@ -27,7 +27,7 @@ class CBISDDSMDatasetFactory:
         self.__patch_transform_selected = False
         self.__split_validation = False
         self.__validation_percentage = 0.0
-        self.__split_cross_validation = True
+        self.__split_cross_validation = False
         self.__cross_validation_folds = 5
 
     @staticmethod
@@ -221,7 +221,8 @@ class CBISDDSMDatasetFactory:
             train_dataset = CBISDDSMClassificationDataset(self.__dataframe, self.__config['download_path'], attribute,
                                                           label_list,
                                                           masks=mask_input, transform=Compose(self.__transform_list),
-                                                          image_transform=Compose(self.__image_transform_list))
+                                                          train_image_transform=Compose(self.__image_transform_list),
+                                                          test_image_transform=Compose(self.__image_transform_list))
 
             return (train_dataset, )
 

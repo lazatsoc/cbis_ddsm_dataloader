@@ -40,8 +40,8 @@ provided in this folder, that should point to the same `download_path` with the 
 
 ### Training / Testing subsets
 The CBIS-DDSM database provides two subsets for training and testing purposes, respectively. 
-With `CBISDDSMDatasetFactory` either one or both of them can be accessed via the `.train()` and
-`.test()` functions:
+With `CBISDDSMDatasetFactory` either one can be accessed via the `.train()` and
+`.test()` functions or both of them merged via the `.train_test_merge()` function:
 
 ```python
 dataset = CBISDDSMDatasetFactory('./config.json').train()
@@ -95,7 +95,9 @@ dataset = CBISDDSMDatasetFactory('./config.json') \
         .add_masses() \
         .lesion_patches_centered()
 ```
-
+Please note that there are some cases where the mass is located near the boundary of the mammogram image. 
+In these cases the patch is adjusted (translated) to contain the mass even if it is not centered.
+An example of this option is given in `examples/centered_patch_classification_dataset.py`.
 #### B. Random patch transform
 By using the option 
 ```python
@@ -103,3 +105,37 @@ By using the option
 ```
 the factory will provide random patches of size `shape`, sampled on random locations around the lesion. 
 The `min_overlap` parameter specifies the minimum percentage of overlap that the patch should have with the lesion.
+An example of this option is given in `examples/random_patch_classification_dataset.py`.
+### Image transforms
+`CBISDDSMDatasetFactory` supports the application of PyTorch image transforms on the CBIS-DDSM samples,
+both whole images and patches. This is achieved via the function
+```python
+.add_image_transforms(transform_list, for_train = True, for_val = True)
+```
+that accepts a list of transforms. The parameters `for_train` and `for_val` constrain the application of the 
+transform to a specific mode (training mode or validation mode). In this way, the preprocessing transforms can be applied
+to all the samples, but the augmentation transforms can be applied only for training.
+After the dataset creation, the functions `.train_mode()` and `test_mode()` activate the corresponding configuration.
+An example of this option is given in `examples/centered_patch_classification_train_val_split.py`.
+### Splitting
+`CBISDDSMDatasetFactory` provides two options for splitting the dataset for training and validation 
+purposed. 
+
+#### A. Train-val split
+By using the option
+```python
+.split_train_val(validation_percentage=0.2)
+```
+the factory will return a tuple with two distinct datasets, one for training and one for testing. 
+The parameter `validation_percentage` specifies the ratio that will be held out for validation.
+An example of this option is given in `examples/centered_patch_classification_train_val_split.py`
+#### B. Cross-validation
+By using the option
+```python
+.split_cross_validation(k_folds=5)
+```
+the factory will return a tuple with `k_fold` splits of the dataset in training/validation. For each split, the training
+dataset will contain a ratio of `(k_fold - 1)/k_fold` of the total samples while the validation set will
+contain `1/k_fold` of the total samples. The partitioning is performed in a mutually exclusive fashion, i.e. 
+a sample is used exactly `k_fold` times for validation. An example of this option is given in 
+`examples/centered_patch_classification_crossval.py`.

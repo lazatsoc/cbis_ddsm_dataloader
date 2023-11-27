@@ -21,7 +21,7 @@ def _find_boundaries(x, y, w, h, image_shape, patch_size, min_overlap):
 def random_patch_transform(patch_size=(1024, 1024), min_overlap=0.9):
     def perform(sample):
         image_tensor_list, item = sample['image_tensor_list'], sample['item']
-        image_shape = image_tensor_list[0].shape
+        image_shape = image_tensor_list[-1].shape[1:3]
 
         abnorm_w = (item['maxx'] - item['minx']) / 2
         abnorm_x = int(abnorm_w + item['minx'])
@@ -36,8 +36,8 @@ def random_patch_transform(patch_size=(1024, 1024), min_overlap=0.9):
 
         out_tensors = []
         for image_tensor in image_tensor_list:
-            image_tensor = image_tensor[patch_y: patch_y + patch_size[1], patch_x: patch_x + patch_size[0]]
-            out_tensors.append(image_tensor)
+            image_tensor_cropped = image_tensor[:, patch_y: patch_y + patch_size[1], patch_x: patch_x + patch_size[0]]
+            out_tensors.append(image_tensor_cropped)
 
         sample = {'image_tensor_list': out_tensors, 'item': item}
         return sample
