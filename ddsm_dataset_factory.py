@@ -11,10 +11,15 @@ from datasets.classification_dataset import CBISDDSMClassificationDataset
 
 
 class CBISDDSMDatasetFactory:
-    def __init__(self, config_path) -> None:
+    def __init__(self,
+                 config_path,
+                 include_train_set=True,
+                 include_test_set=False,
+                 include_masses=True,
+                 include_calcifications=False) -> None:
         self.__config = self.__read_config(config_path)
-        self.__train: bool = False
-        self.__test: bool = False
+        self.__train: bool = include_train_set
+        self.__test: bool = include_test_set
         self.__dataframe = None
         self.__excluded_attrs: List[str] = []
         self.__excluded_values: Dict[str, set] = {'lesion_type': {'mass', 'calcification'}}
@@ -29,6 +34,12 @@ class CBISDDSMDatasetFactory:
         self.__validation_percentage = 0.0
         self.__split_cross_validation = False
         self.__cross_validation_folds = 5
+
+        if include_masses:
+            self.__excluded_values['lesion_type'].remove('mass')
+
+        if include_calcifications:
+            self.__excluded_values['lesion_type'].remove('calcification')
 
     @staticmethod
     def __read_config(config_path):
@@ -57,27 +68,6 @@ class CBISDDSMDatasetFactory:
         for attribute, mapping in self.__attribute_mapped_values.items():
             for v1, v2 in mapping.items():
                 self.__dataframe[attribute].replace(v1, v2, inplace=True)
-
-    def add_masses(self):
-        self.__excluded_values['lesion_type'].remove('mass')
-        return self
-
-    def add_calcifications(self):
-        self.__excluded_values['lesion_type'].remove('calcification')
-        return self
-
-    def train(self):
-        self.__train = True
-        return self
-
-    def test(self):
-        self.__test = True
-        return self
-
-    def train_test_merge(self):
-        self.__train = True
-        self.__test = True
-        return self
 
     def drop_attribute_values(self, attribute: str, *value_list: str):
         value_set = self.__excluded_values.get(attribute, set())

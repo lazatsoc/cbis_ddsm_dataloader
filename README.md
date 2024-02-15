@@ -33,27 +33,24 @@ the images to PNG format and pre-process the database csv files. Note that separ
 processes are provided in the `utils` folder.
 
 ## Creating a dataset
-Datasets are created using the class `CBISDDSMDatasetFactory` that provides a verstatile way to filter lesions,
+Datasets are created using the class `CBISDDSMDatasetFactory` that provides a versatile way to filter lesions,
 manage their attributes and apply transformations on the corresponding images. A detailed description of the factory
 functions is given below. Additionally, the folder `examples` provides common cases of dataset creation. Keep in mind that a different copy of `config.json` is
 provided in this folder, that should point to the same `download_path` with the original setup config.
 
-### Training / Testing subsets
-The CBIS-DDSM database provides two subsets for training and testing purposes, respectively. 
-With `CBISDDSMDatasetFactory` either one can be accessed via the `.train()` and
-`.test()` functions or both of them merged via the `.train_test_merge()` function:
+### Lesion type and subset selection Training / Testing subsets
+The CBIS-DDSM database provides two distinct subsets for `mass` and `calcifiactions` lesion types
+that are further split into two subsets for training and testing purposes. 
+With `CBISDDSMDatasetFactory` the selection of the appropriate subset or the merging of subsets is 
+supported via the constructor arguments:
 
 ```python
-dataset = CBISDDSMDatasetFactory('./config.json').train()
-```
+CBISDDSMDatasetFactory('./config.json', 
+                    include_train_set=True,
+                    include_test_set=True,
+                    include_calcifications=False,
+                    include_masses=True)
 
-### Mass / Micro-calcification subsets
-CBIS-DDSM provides two distinct subsets, concerning lesions of type `mass` or `calcification`. 
-With `CBISDDSMDatasetFactory` either one or both of them can be accessed via the `.add_masses()` and 
-`.add_calcifications()` functions:
-
-```python
-dataset = CBISDDSMDatasetFactory('./config.json').train().add_masses()
 ```
 
 ### Attribute manipulation

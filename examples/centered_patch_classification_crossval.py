@@ -1,9 +1,7 @@
 from ddsm_dataset_factory import CBISDDSMDatasetFactory
 from torchvision import transforms
 
-datasets = CBISDDSMDatasetFactory('./config.json') \
-        .train_test_merge() \
-        .add_masses() \
+fold1, fold2, fold3, fold4, fold5 = CBISDDSMDatasetFactory('./config.json') \
         .drop_attributes("assessment", "breast_density", "subtlety") \
         .map_attribute_value('pathology', {'BENIGN_WITHOUT_CALLBACK': 'BENIGN'}) \
         .show_counts() \
@@ -17,4 +15,4 @@ datasets = CBISDDSMDatasetFactory('./config.json') \
         .create_classification('pathology', mask_input=True)
 
 
-datasets[0][0].visualize()
+fold1[0].visualize()
