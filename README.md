@@ -47,7 +47,7 @@ supported via the constructor arguments:
 ```python
 CBISDDSMDatasetFactory('./config.json', 
                     include_train_set=True,
-                    include_test_set=True,
+                    include_test_set=False,
                     include_calcifications=False,
                     include_masses=True)
 
@@ -59,16 +59,12 @@ In CBIS-DDSM, a broad set of attributes is provided for each lesion. The `CBISDD
 `pathology` label `BENIGN_WITHOUT_CALLBACK` to be changed to `BENIGN`. This can be achieved with the following code:
 ```python
 dataset = CBISDDSMDatasetFactory('./config.json') \
-        .train() \
-        .add_masses() \
         .map_attribute_value('pathology', {'BENIGN_WITHOUT_CALLBACK': 'BENIGN'})
 ```
 Additionally, attributes that are not relevant can be dropped via the `.drop_attributes()` method:
 
 ```python
 dataset = CBISDDSMDatasetFactory('./config.json') \
-        .train() \
-        .add_masses() \
         .drop_attributes("assessment", "breast_density", "subtlety")
 ```
 
@@ -88,8 +84,6 @@ The default size is set to `(1024, 1024)`, which is sufficient for all the masse
 
 ```python
 dataset = CBISDDSMDatasetFactory('./config.json') \
-        .train() \
-        .add_masses() \
         .lesion_patches_centered()
 ```
 Please note that there are some cases where the mass is located near the boundary of the mammogram image. 
