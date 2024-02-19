@@ -9,7 +9,7 @@ from torchvision.transforms import functional as F
 
 
 class CBISDDSMGenericDataset(Dataset):
-    def __init__(self, dataframe, download_path, masks=False, transform=None, train_image_tranform=None, test_image_tranform=None):
+    def __init__(self, dataframe, download_path, masks=False, transform=None, train_image_transform=None, test_image_transform=None):
         self.dataframe = dataframe
         self.download_path = download_path
         self.transform = transform
@@ -17,16 +17,17 @@ class CBISDDSMGenericDataset(Dataset):
         self.current_index = 0
         self.__train_mode = False
         self.__test_mode = False
-        self.__train_image_transforms = train_image_tranform
-        self.__test_image_transforms = test_image_tranform
+        self.__train_image_transforms = train_image_transform
+        self.__test_image_transforms = test_image_transform
 
 
     def __getitem__(self, index):
         item = self.dataframe.iloc[index].to_dict()
         img_path = os.path.join(self.download_path, item['image_path'])
         image = Image.open(img_path)
+        max_value = 65536 if image.mode == 'I' else 256
         image_tensor = F.pil_to_tensor(image).float()
-        image_tensor /= 65535
+        image_tensor /= max_value
         image_tensor_list = [image_tensor]
 
         if self.include_masks:

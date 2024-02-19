@@ -1,14 +1,17 @@
+import hashlib
 import json
 import os.path
 import pandas as pd
 from typing import List, Dict, Tuple
-
 from torchvision.transforms import Compose
-from transforms.patches_centered import centered_patch_transform
-from transforms.patches_random import random_patch_transform
+from tqdm import tqdm
+from datasets.generic_dataset import CBISDDSMGenericDataset
+from transforms.patches_centered import CenteredPatches
+from transforms.patches_random import RandomPatches
 from transforms.patches_normal import normal_patch_transform_wrapper
 from datasets.classification_dataset import CBISDDSMClassificationDataset
-
+from PIL import Image
+import numpy as np
 
 class CBISDDSMDatasetFactory:
     def __init__(self,
@@ -18,6 +21,7 @@ class CBISDDSMDatasetFactory:
                  include_masses=True,
                  include_calcifications=False) -> None:
         self.__config = self.__read_config(config_path)
+        self.__download_folder = self.__config["download_path"]
         self.__train: bool = include_train_set
         self.__test: bool = include_test_set
         self.__dataframe = None
@@ -34,6 +38,7 @@ class CBISDDSMDatasetFactory:
         self.__validation_percentage = 0.0
         self.__split_cross_validation = False
         self.__cross_validation_folds = 5
+        self.__from_cache = False
 
         if include_masses:
             self.__excluded_values['lesion_type'].remove('mass')
@@ -51,9 +56,9 @@ class CBISDDSMDatasetFactory:
         try:
             csv_file_list = []
             if self.__train:
-                csv_file_list.append(os.path.join(self.__config['download_path'], 'lesions_train.csv'))
+                csv_file_list.append(os.path.join(self.__download_folder, 'lesions_train.csv'))
             if self.__test:
-                csv_file_list.append(os.path.join(self.__config['download_path'], 'lesions_test.csv'))
+                csv_file_list.append(os.path.join(self.__download_folder, 'lesions_test.csv'))
 
             self.__dataframe = pd.concat((pd.read_csv(f) for f in csv_file_list), ignore_index=True)
         except:
@@ -68,6 +73,8 @@ class CBISDDSMDatasetFactory:
         for attribute, mapping in self.__attribute_mapped_values.items():
             for v1, v2 in mapping.items():
                 self.__dataframe[attribute].replace(v1, v2, inplace=True)
+
+        self.__dataframe.reset_index(inplace=True, drop=True)
 
     def drop_attribute_values(self, attribute: str, *value_list: str):
         value_set = self.__excluded_values.get(attribute, set())
@@ -86,7 +93,9 @@ class CBISDDSMDatasetFactory:
         return self
 
     def show_counts(self):
-        self.__fetch_filter_lesions()
+        if not self.__from_cache:
+            self.__fetch_filter_lesions()
+
         df = self.__dataframe
         labels_list = ["lesion_type", "type1", "type2", "pathology", "assessment", "breast_density", "subtlety"]
         print(os.linesep)
@@ -100,14 +109,14 @@ class CBISDDSMDatasetFactory:
     def lesion_patches_centered(self, shape: Tuple[int] = (1024, 1024)):
         if self.__patch_transform_selected:
             raise Exception('Patch transform already selected!')
-        self.__transform_list.append(centered_patch_transform(shape))
+        self.__transform_list.append(CenteredPatches(shape))
         self.__patch_transform_selected = True
         return self
 
     def lesion_patches_random(self, shape: Tuple[int] = (1024, 1024), min_overlap=0.9, normal_probability=0.0):
         if self.__patch_transform_selected:
             raise Exception('Patch transform already selected!')
-        patch_transform = random_patch_transform(shape, min_overlap)
+        patch_transform = RandomPatches(shape, min_overlap=min_overlap)
         if normal_probability > 0:
             self.__plus_normal = True
             patch_transform = normal_patch_transform_wrapper(patch_transform, normal_probability, shape,
@@ -115,6 +124,60 @@ class CBISDDSMDatasetFactory:
         self.__transform_list.append(patch_transform)
         self.__patch_transform_selected = True
         return self
+
+    def cache_here(self):
+        self.__fetch_filter_lesions()
+        cache_name = hashlib.sha1(pd.util.hash_pandas_object(self.__dataframe, index=True).values)
+        for trans in self.__transform_list:
+            cache_name.update(bytes(str(trans), 'utf-8'))
+        for trans in self.__image_transform_list:
+            cache_name.update(bytes(str(trans), 'utf-8'))
+        cache_name = cache_name.hexdigest()
+
+        cache_path = os.path.join(self.__download_folder, 'cache', cache_name)
+        cache_dataframe_path = os.path.join(cache_path, "dataframe.csv")
+
+        if os.path.exists(cache_path) and os.path.exists(cache_dataframe_path):
+            self.__dataframe = pd.read_csv(cache_dataframe_path)
+
+        else:
+            os.makedirs(cache_path, exist_ok=True)
+            dataset = CBISDDSMGenericDataset(self.__dataframe, self.__download_folder,
+                                              masks=True, transform=Compose(self.__transform_list),
+                                              train_image_transform=Compose(self.__image_transform_list),
+                                              test_image_transform=Compose(self.__image_transform_list))
+
+            counter = 0
+            for a in tqdm(dataset):
+                sample_name = f"{counter:05d}"
+
+                image_name = sample_name + ".png"
+                image_path = os.path.join(cache_path, image_name)
+                image = a[0][0].cpu().detach().numpy().squeeze() * 255
+                img_pil = Image.fromarray(image.astype(np.uint8))
+                img_pil.save(image_path, )
+                self.__dataframe.at[counter, "image_path"] = image_name
+
+                mask_name = sample_name + "_mask.png"
+                mask_path = os.path.join(cache_path, mask_name)
+                mask = a[0][1].cpu().detach().numpy().squeeze() * 255
+                mask_pil = Image.fromarray(mask.astype(np.uint8))
+                mask_pil.save(mask_path)
+                self.__dataframe.at[counter, "mask_path"] = mask_name
+
+                counter += 1
+
+            self.__dataframe.to_csv(cache_dataframe_path)
+
+        self.__transform_list.clear()
+        self.__image_transform_list.clear()
+        self.__image_transform_list_applied_training.clear()
+        self.__image_transform_list_applied_validation.clear()
+        self.__download_folder = cache_path
+        self.__from_cache = True
+        
+        return self
+
 
     def add_image_transforms(self, transform_list: List, for_train: bool = True, for_val: bool = True):
         self.__image_transform_list.extend(transform_list)
@@ -135,7 +198,9 @@ class CBISDDSMDatasetFactory:
         return self
 
     def create_classification(self, attribute: str, mask_input: bool = False):
-        self.__fetch_filter_lesions()
+        if not self.__from_cache:
+            self.__fetch_filter_lesions()
+
         label_list = self.__dataframe[attribute].unique().tolist()
         if self.__plus_normal:
             label_list.append('NORMAL')
@@ -153,13 +218,13 @@ class CBISDDSMDatasetFactory:
             val_transforms = [trans for trans, fv in
                               zip(self.__image_transform_list, self.__image_transform_list_applied_validation) if fv]
 
-            train_dataset = CBISDDSMClassificationDataset(train_dataframe, self.__config['download_path'], attribute, label_list,
+            train_dataset = CBISDDSMClassificationDataset(train_dataframe, self.__download_folder, attribute, label_list,
                                                           masks=mask_input, transform=Compose(self.__transform_list),
                                                           train_image_transform=Compose(train_image_transforms),
                                                           test_image_transform=Compose(val_transforms))
 
             val_dataframe = shuffled_dataframe.iloc[:num_validation, :]
-            val_dataset = CBISDDSMClassificationDataset(val_dataframe, self.__config['download_path'], attribute,
+            val_dataset = CBISDDSMClassificationDataset(val_dataframe, self.__download_folder, attribute,
                                                         label_list,
                                                         masks=mask_input, transform=Compose(self.__transform_list),
                                                         train_image_transform=Compose(train_image_transforms),
@@ -189,7 +254,7 @@ class CBISDDSMDatasetFactory:
             for i in range(self.__cross_validation_folds):
                 train_dataframe = pd.concat(list(d for ind, d in enumerate(fold_dataframes) if ind != i),
                                             ignore_index=True)
-                train_dataset = CBISDDSMClassificationDataset(train_dataframe, self.__config['download_path'],
+                train_dataset = CBISDDSMClassificationDataset(train_dataframe, self.__download_folder,
                                                               attribute, label_list,
                                                               masks=mask_input,
                                                               transform=Compose(self.__transform_list),
@@ -197,7 +262,7 @@ class CBISDDSMDatasetFactory:
                                                               test_image_transform=Compose(val_transforms))
 
                 val_dataframe = fold_dataframes[i]
-                val_dataset = CBISDDSMClassificationDataset(val_dataframe, self.__config['download_path'], attribute,
+                val_dataset = CBISDDSMClassificationDataset(val_dataframe, self.__download_folder, attribute,
                                                             label_list,
                                                             masks=mask_input, transform=Compose(self.__transform_list),
                                                             train_image_transform=Compose(train_image_transforms),
@@ -208,23 +273,10 @@ class CBISDDSMDatasetFactory:
             return datasets
 
         else:
-            train_dataset = CBISDDSMClassificationDataset(self.__dataframe, self.__config['download_path'], attribute,
+            train_dataset = CBISDDSMClassificationDataset(self.__dataframe, self.__download_folder, attribute,
                                                           label_list,
                                                           masks=mask_input, transform=Compose(self.__transform_list),
                                                           train_image_transform=Compose(self.__image_transform_list),
                                                           test_image_transform=Compose(self.__image_transform_list))
 
             return (train_dataset, )
-
-
-if __name__ == "__main__":
-    dataset = CBISDDSMDatasetFactory('./config.json') \
-        .train() \
-        .add_masses() \
-        .drop_attributes("assessment", "breast_density", "subtlety") \
-        .map_attribute_value('pathology', {'BENIGN_WITHOUT_CALLBACK': 'BENIGN'}) \
-        .show_counts() \
-        .lesion_patches_random(normal_probability=0.8) \
-        .create_classification('pathology', mask_input=True)
-    dataset.visualize()
-    pass

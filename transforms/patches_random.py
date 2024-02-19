@@ -17,9 +17,13 @@ def _find_boundaries(x, y, w, h, image_shape, patch_size, min_overlap):
 
     return min_x, max_x, min_y, max_y
 
+class RandomPatches(torch.nn.Module):
+    def __init__(self, patch_size=(1024, 1024), min_overlap=0.9):
+        super(RandomPatches, self).__init__()
+        self.min_overlap = min_overlap
+        self.patch_size = patch_size
 
-def random_patch_transform(patch_size=(1024, 1024), min_overlap=0.9):
-    def perform(sample):
+    def forward(self, sample):
         image_tensor_list, item = sample['image_tensor_list'], sample['item']
         image_shape = image_tensor_list[-1].shape[1:3]
 
@@ -28,18 +32,20 @@ def random_patch_transform(patch_size=(1024, 1024), min_overlap=0.9):
         abnorm_h = (item['maxy'] - item['miny']) / 2
         abnorm_y = int(abnorm_h + item['miny'])
 
-        min_x, max_x, min_y, max_y = _find_boundaries(abnorm_x, abnorm_y, abnorm_w, abnorm_h, image_shape, patch_size,
-                                                      min_overlap)
+        min_x, max_x, min_y, max_y = _find_boundaries(abnorm_x, abnorm_y, abnorm_w, abnorm_h, image_shape, self.patch_size,
+                                                      self.min_overlap)
 
         patch_y = torch.randint(min_y, max_y + 1, (1,))
         patch_x = torch.randint(min_x, max_x + 1, (1,))
 
         out_tensors = []
         for image_tensor in image_tensor_list:
-            image_tensor_cropped = image_tensor[:, patch_y: patch_y + patch_size[1], patch_x: patch_x + patch_size[0]]
+            image_tensor_cropped = image_tensor[:, patch_y: patch_y + self.patch_size[1], patch_x: patch_x + self.patch_size[0]]
             out_tensors.append(image_tensor_cropped)
 
         sample = {'image_tensor_list': out_tensors, 'item': item}
         return sample
 
-    return perform
+    def __repr__(self):
+        detail = f"(patch_size={self.patch_size}, min_overlap={self.min_overlap})"
+        return f"{self.__class__.__name__}{detail}"
