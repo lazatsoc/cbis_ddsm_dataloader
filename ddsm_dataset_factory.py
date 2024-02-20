@@ -62,7 +62,7 @@ class CBISDDSMDatasetFactory:
 
             self.__dataframe = pd.concat((pd.read_csv(f) for f in csv_file_list), ignore_index=True)
         except:
-            print('Database seems not properly set up. Please (re)run setup.py or check the paths in config.json.')
+            print(f'Database seems not properly set up in folder {self.__config["download_path"]}. Please (re)run setup.py or check the paths in config.json.')
             return
 
         self.__dataframe.drop(self.__excluded_attrs, axis=1, inplace=True)
