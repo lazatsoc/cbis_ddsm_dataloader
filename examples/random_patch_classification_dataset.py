@@ -6,4 +6,4 @@ dataset = CBISDDSMDatasetFactory('./config.json') \
         .show_counts() \
         .lesion_patches_random() \
         .create_classification('pathology')
-dataset[0].visualize()
+dataset.visualize()

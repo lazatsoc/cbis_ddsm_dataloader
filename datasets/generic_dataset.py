@@ -2,11 +2,10 @@ import os
 from torch.utils.data import Dataset
 from PIL import Image, ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True  # Workaround found in: https://stackoverflow.com/questions/42462431/oserror-broken-data-stream-when-reading-image-file
-import numpy as np
 import torch
 from matplotlib import pyplot as plt
 from torchvision.transforms import functional as F
-
+import pandas as pd
 
 class CBISDDSMGenericDataset(Dataset):
     def __init__(self, dataframe, download_path, masks=False, transform=None, train_image_transform=None, test_image_transform=None):
@@ -17,8 +16,8 @@ class CBISDDSMGenericDataset(Dataset):
         self.current_index = 0
         self.__train_mode = False
         self.__test_mode = False
-        self.__train_image_transforms = train_image_transform
-        self.__test_image_transforms = test_image_transform
+        self._train_image_transforms = train_image_transform
+        self._test_image_transforms = test_image_transform
 
 
     def __getitem__(self, index):
@@ -42,16 +41,16 @@ class CBISDDSMGenericDataset(Dataset):
         if self.transform is not None:
             sample = self.transform(sample)
 
-        if self.__train_mode and self.__train_image_transforms is not None:
+        if self.__train_mode and self._train_image_transforms is not None:
             state = torch.get_rng_state()
             for i in range(len(sample['image_tensor_list'])):
                 torch.set_rng_state(state)
-                sample['image_tensor_list'][i] = self.__train_image_transforms(sample['image_tensor_list'][i])
-        elif self.__test_mode and self.__test_image_transforms is not None:
+                sample['image_tensor_list'][i] = self._train_image_transforms(sample['image_tensor_list'][i])
+        elif self.__test_mode and self._test_image_transforms is not None:
             state = torch.get_rng_state()
             for i in range(len(sample['image_tensor_list'])):
                 torch.set_rng_state(state)
-                sample['image_tensor_list'][i] = self.__test_image_transforms(sample['image_tensor_list'][i])
+                sample['image_tensor_list'][i] = self._test_image_transforms(sample['image_tensor_list'][i])
 
         return sample['image_tensor_list'], sample['item']
 
@@ -85,6 +84,44 @@ class CBISDDSMGenericDataset(Dataset):
         self.__train_mode = False
         self.__test_mode = True
         return self
+
+    def _split_dataframe(self, split_ratio, shuffle=False, random_state=None):
+        if shuffle:
+            dataframe = self.dataframe.sample(frac=1, random_state=random_state)
+        else:
+            dataframe = self.dataframe
+
+        num_samples = len(dataframe.index)
+        num_samples1 = int(num_samples * split_ratio)
+
+        dataframe1 = dataframe.iloc[num_samples1:, :]
+        dataframe2 = dataframe.iloc[:num_samples1, :]
+
+        return dataframe1, dataframe2
+
+    def _split_dataframe_crossval(self, folds, shuffle=False, random_state=None):
+        if shuffle:
+            dataframe = self.dataframe.sample(frac=1, random_state=random_state)
+        else:
+            dataframe = self.dataframe
+
+        num_samples = len(dataframe.index)
+        num_sample_per_fold = int(num_samples / folds)
+
+        fold_dataframes = []
+        for i in range(folds):
+            start_i = i * num_sample_per_fold
+            end_i = (i + 1) * num_sample_per_fold
+            fold_dataframe = dataframe.iloc[start_i:end_i, :]
+            fold_dataframes.append(fold_dataframe)
+
+        cv_dataframe_pairs = []
+        for i in range(folds):
+            train_dataframe = pd.concat(list(d for ind, d in enumerate(fold_dataframes) if ind != i), ignore_index=True)
+            val_dataframe = fold_dataframes[i]
+            cv_dataframe_pairs.append((train_dataframe, val_dataframe))
+
+        return cv_dataframe_pairs
 
     def visualize(self):
         if self.include_masks:

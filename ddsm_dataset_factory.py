@@ -34,10 +34,6 @@ class CBISDDSMDatasetFactory:
         self.__image_transform_list_applied_validation = []
         self.__plus_normal = False
         self.__patch_transform_selected = False
-        self.__split_validation = False
-        self.__validation_percentage = 0.0
-        self.__split_cross_validation = False
-        self.__cross_validation_folds = 5
         self.__from_cache = False
 
         if include_masses:
@@ -185,12 +181,6 @@ class CBISDDSMDatasetFactory:
         self.__image_transform_list_applied_validation.extend([for_val]*len(transform_list))
         return self
 
-    def split_train_val(self, validation_percentage: float):
-        self.__split_cross_validation = False
-        self.__split_validation = True
-        self.__validation_percentage = validation_percentage
-        return self
-
     def split_cross_validation(self, k_folds=5):
         self.__split_validation = False
         self.__split_cross_validation = True
@@ -205,78 +195,10 @@ class CBISDDSMDatasetFactory:
         if self.__plus_normal:
             label_list.append('NORMAL')
 
-        if self.__split_validation:
-            shuffled_dataframe = self.__dataframe.sample(frac=1)
-            num_samples = len(shuffled_dataframe.index)
-            num_validation = int(num_samples * self.__validation_percentage)
+        dataset = CBISDDSMClassificationDataset(self.__dataframe, self.__download_folder, attribute,
+                                                      label_list,
+                                                      masks=mask_input, transform=Compose(self.__transform_list),
+                                                      train_image_transform=Compose(self.__image_transform_list),
+                                                      test_image_transform=Compose(self.__image_transform_list))
 
-            train_dataframe = shuffled_dataframe.iloc[num_validation:, :]
-
-            train_image_transforms = [trans for trans, ft in
-                                      zip(self.__image_transform_list, self.__image_transform_list_applied_training) if
-                                      ft]
-            val_transforms = [trans for trans, fv in
-                              zip(self.__image_transform_list, self.__image_transform_list_applied_validation) if fv]
-
-            train_dataset = CBISDDSMClassificationDataset(train_dataframe, self.__download_folder, attribute, label_list,
-                                                          masks=mask_input, transform=Compose(self.__transform_list),
-                                                          train_image_transform=Compose(train_image_transforms),
-                                                          test_image_transform=Compose(val_transforms))
-
-            val_dataframe = shuffled_dataframe.iloc[:num_validation, :]
-            val_dataset = CBISDDSMClassificationDataset(val_dataframe, self.__download_folder, attribute,
-                                                        label_list,
-                                                        masks=mask_input, transform=Compose(self.__transform_list),
-                                                        train_image_transform=Compose(train_image_transforms),
-                                                        test_image_transform=Compose(val_transforms))
-
-            return train_dataset.train_mode(), val_dataset.test_mode()
-
-        elif self.__split_cross_validation:
-            shuffled_dataframe = self.__dataframe.sample(frac=1)
-            num_samples = len(shuffled_dataframe.index)
-            num_sample_per_fold = int(num_samples / self.__cross_validation_folds)
-            train_image_transforms = [trans for trans, ft in
-                                      zip(self.__image_transform_list, self.__image_transform_list_applied_training)
-                                      if ft]
-            val_transforms = [trans for trans, fv in
-                              zip(self.__image_transform_list, self.__image_transform_list_applied_validation) if
-                              fv]
-
-            fold_dataframes = []
-            for i in range(self.__cross_validation_folds):
-                start_i = i * num_sample_per_fold
-                end_i = (i + 1) * num_sample_per_fold
-                dataframe = shuffled_dataframe.iloc[start_i:end_i, :]
-                fold_dataframes.append(dataframe)
-
-            datasets = []
-            for i in range(self.__cross_validation_folds):
-                train_dataframe = pd.concat(list(d for ind, d in enumerate(fold_dataframes) if ind != i),
-                                            ignore_index=True)
-                train_dataset = CBISDDSMClassificationDataset(train_dataframe, self.__download_folder,
-                                                              attribute, label_list,
-                                                              masks=mask_input,
-                                                              transform=Compose(self.__transform_list),
-                                                              train_image_transform=Compose(train_image_transforms),
-                                                              test_image_transform=Compose(val_transforms))
-
-                val_dataframe = fold_dataframes[i]
-                val_dataset = CBISDDSMClassificationDataset(val_dataframe, self.__download_folder, attribute,
-                                                            label_list,
-                                                            masks=mask_input, transform=Compose(self.__transform_list),
-                                                            train_image_transform=Compose(train_image_transforms),
-                                                            test_image_transform=Compose(val_transforms))
-
-                datasets.append((train_dataset.train_mode(), val_dataset.test_mode()))
-
-            return datasets
-
-        else:
-            train_dataset = CBISDDSMClassificationDataset(self.__dataframe, self.__download_folder, attribute,
-                                                          label_list,
-                                                          masks=mask_input, transform=Compose(self.__transform_list),
-                                                          train_image_transform=Compose(self.__image_transform_list),
-                                                          test_image_transform=Compose(self.__image_transform_list))
-
-            return (train_dataset, )
+        return dataset

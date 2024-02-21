@@ -5,4 +5,4 @@ dataset = CBISDDSMDatasetFactory('./config.json') \
         .map_attribute_value('pathology', {'BENIGN_WITHOUT_CALLBACK': 'BENIGN'}) \
         .show_counts() \
         .create_classification('pathology')
-dataset[0].visualize()
+dataset.visualize()
