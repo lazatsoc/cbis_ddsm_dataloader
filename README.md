@@ -117,7 +117,7 @@ By using the option
 ```python
 dataset.split_train_val(self, val_ratio, shuffle=False, random_state=None)
 ```
-the factory will return a tuple with two distinct datasets, one for training and one for testing. 
+the dataset will return a tuple with two distinct datasets, one for training and one for testing. 
 The parameter `val_ratio` specifies the ratio that will be held out for validation.
 An example of this option is given in `examples/centered_patch_classification_train_val_split.py`
 #### B. Cross-validation
@@ -125,7 +125,7 @@ By using the option
 ```python
 dataset.split_crossval(self, folds, shuffle=False, random_state=None)
 ```
-the factory will return a tuple with `folds` splits of the dataset in training/validation. For each split, the training
+the dataset will return a tuple with `folds` splits of the dataset in training/validation. For each split, the training
 dataset will contain a ratio of `(folds - 1)/folds` of the total samples while the validation set will
 contain `1/folds` of the total samples. The partitioning is performed in a mutually exclusive fashion, i.e. 
 a sample is used exactly `folds` times for validation. An example of this option is given in 
