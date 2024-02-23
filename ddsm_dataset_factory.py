@@ -32,6 +32,7 @@ class CBISDDSMDatasetFactory:
         self.__image_transform_list = []
         self.__image_transform_list_applied_training = []
         self.__image_transform_list_applied_validation = []
+        self.__image_transform_list_applied_mask = []
         self.__plus_normal = False
         self.__patch_transform_selected = False
         self.__from_cache = False
@@ -139,9 +140,10 @@ class CBISDDSMDatasetFactory:
         else:
             os.makedirs(cache_path, exist_ok=True)
             dataset = CBISDDSMGenericDataset(self.__dataframe, self.__download_folder,
-                                              masks=True, transform=Compose(self.__transform_list),
-                                              train_image_transform=Compose(self.__image_transform_list),
-                                              test_image_transform=Compose(self.__image_transform_list))
+                                             masks=True,
+                                             transform=Compose(self.__transform_list),
+                                             train_image_transform=self.__image_transform_list,
+                                             test_image_transform=self.__image_transform_list)
 
             counter = 0
             for a in tqdm(dataset):
@@ -175,10 +177,11 @@ class CBISDDSMDatasetFactory:
         return self
 
 
-    def add_image_transforms(self, transform_list: List, for_train: bool = True, for_val: bool = True):
+    def add_image_transforms(self, transform_list: List, for_train: bool = True, for_val: bool = True, for_mask=True):
         self.__image_transform_list.extend(transform_list)
         self.__image_transform_list_applied_training.extend([for_train]*len(transform_list))
         self.__image_transform_list_applied_validation.extend([for_val]*len(transform_list))
+        self.__image_transform_list_applied_mask.extend([for_mask]*len(transform_list))
         return self
 
     def split_cross_validation(self, k_folds=5):
@@ -195,10 +198,23 @@ class CBISDDSMDatasetFactory:
         if self.__plus_normal:
             label_list.append('NORMAL')
 
+        train_image_transforms = [trans for trans, ft in
+                                  zip(self.__image_transform_list, self.__image_transform_list_applied_training) if
+                                  ft]
+        train_image_transform_for_mask_flags = [flag for flag, ft in
+                                  zip(self.__image_transform_list_applied_mask, self.__image_transform_list_applied_training) if
+                                  ft]
+        val_transforms = [trans for trans, fv in
+                          zip(self.__image_transform_list, self.__image_transform_list_applied_validation) if fv]
+        val_image_transform_for_mask_flags = [flag for flag, fv in
+                          zip(self.__image_transform_list_applied_mask, self.__image_transform_list_applied_validation) if fv]
+
         dataset = CBISDDSMClassificationDataset(self.__dataframe, self.__download_folder, attribute,
-                                                      label_list,
-                                                      masks=mask_input, transform=Compose(self.__transform_list),
-                                                      train_image_transform=Compose(self.__image_transform_list),
-                                                      test_image_transform=Compose(self.__image_transform_list))
+                                                label_list,
+                                                masks=mask_input, transform=Compose(self.__transform_list),
+                                                train_image_transform=train_image_transforms,
+                                                train_image_transform_for_mask_flags=train_image_transform_for_mask_flags,
+                                                test_image_transform=val_transforms,
+                                                test_image_transform_for_mask_flags=val_image_transform_for_mask_flags)
 
         return dataset

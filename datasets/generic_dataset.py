@@ -1,24 +1,36 @@
 import os
+from typing import List, Union, Tuple
+
 from torch.utils.data import Dataset
 from PIL import Image, ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True  # Workaround found in: https://stackoverflow.com/questions/42462431/oserror-broken-data-stream-when-reading-image-file
 import torch
 from matplotlib import pyplot as plt
 from torchvision.transforms import functional as F
+from torchvision.transforms import Compose
 import pandas as pd
 
 class CBISDDSMGenericDataset(Dataset):
-    def __init__(self, dataframe, download_path, masks=False, transform=None, train_image_transform=None, test_image_transform=None):
-        self.dataframe = dataframe
-        self.download_path = download_path
-        self.transform = transform
-        self.include_masks = masks
-        self.current_index = 0
-        self.__train_mode = False
-        self.__test_mode = False
-        self._train_image_transforms = train_image_transform
+    def __init__(self,
+                 dataframe: pd.DataFrame,
+                 download_path: str,
+                 masks: bool = False,
+                 transform: Compose = None,
+                 train_image_transform: Union[List[torch.nn.Module], Tuple[torch.nn.Module]] = None,
+                 train_image_transform_for_mask_flags=None,
+                 test_image_transform: Union[List[torch.nn.Module], Tuple[torch.nn.Module]] = None,
+                 test_image_transform_for_mask_flags=None):
+        self.dataframe: pd.DataFrame = dataframe
+        self.download_path: str = download_path
+        self.transform: Compose = transform
+        self.include_masks: bool = masks
+        self.current_index: int = 0
+        self.__train_mode: bool = False
+        self.__test_mode: bool = False
+        self._train_image_transforms: Union[List[torch.nn.Module], Tuple[torch.nn.Module]] = train_image_transform
+        self._train_image_transform_for_mask_flags = train_image_transform_for_mask_flags
         self._test_image_transforms = test_image_transform
-
+        self._test_image_transform_for_mask_flags = test_image_transform_for_mask_flags
 
     def __getitem__(self, index):
         item = self.dataframe.iloc[index].to_dict()
@@ -42,15 +54,23 @@ class CBISDDSMGenericDataset(Dataset):
             sample = self.transform(sample)
 
         if self.__train_mode and self._train_image_transforms is not None:
-            state = torch.get_rng_state()
-            for i in range(len(sample['image_tensor_list'])):
-                torch.set_rng_state(state)
-                sample['image_tensor_list'][i] = self._train_image_transforms(sample['image_tensor_list'][i])
+            for transform, mask_flag in zip(self._train_image_transforms, self._train_image_transform_for_mask_flags):
+                state = torch.get_rng_state()
+                for i in range(len(sample['image_tensor_list'])):
+                    torch.set_rng_state(state)
+                    sample['image_tensor_list'][i] = transform(sample['image_tensor_list'][i])
+                    if not mask_flag:
+                        break
         elif self.__test_mode and self._test_image_transforms is not None:
-            state = torch.get_rng_state()
-            for i in range(len(sample['image_tensor_list'])):
-                torch.set_rng_state(state)
-                sample['image_tensor_list'][i] = self._test_image_transforms(sample['image_tensor_list'][i])
+            for transform, mask_flag in zip(self._test_image_transforms, self._test_image_transform_for_mask_flags):
+                state = torch.get_rng_state()
+                for i in range(len(sample['image_tensor_list'])):
+                    torch.set_rng_state(state)
+                    sample['image_tensor_list'][i] = transform(sample['image_tensor_list'][i])
+                    if not mask_flag:
+                        break
+        else:
+            raise Exception("No train/test mode selected")
 
         return sample['image_tensor_list'], sample['item']
 
