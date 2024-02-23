@@ -66,13 +66,17 @@ class CBISDDSMClassificationDataset(CBISDDSMGenericDataset):
                                                           self.label_list,
                                                           masks=self.include_masks, transform=self.transform,
                                                           train_image_transform=self._train_image_transforms,
-                                                          test_image_transform=self._test_image_transforms)
+                                                          train_image_transform_for_mask_flags=self._train_image_transform_for_mask_flags,
+                                                          test_image_transform=self._test_image_transforms,
+                                                          test_image_transform_for_mask_flags=self._test_image_transform_for_mask_flags)
             train_dataset.train_mode()
             val_dataset = CBISDDSMClassificationDataset(dataframe_pairs[i][1], self.download_path, self.label_field,
                                                         self.label_list,
                                                         masks=self.include_masks, transform=self.transform,
                                                         train_image_transform=self._train_image_transforms,
-                                                        test_image_transform=self._test_image_transforms)
+                                                        train_image_transform_for_mask_flags=self._train_image_transform_for_mask_flags,
+                                                        test_image_transform=self._test_image_transforms,
+                                                        test_image_transform_for_mask_flags=self._test_image_transform_for_mask_flags)
             val_dataset.test_mode()
             dataset_pairs.append((train_dataset, val_dataset))
         return dataset_pairs
