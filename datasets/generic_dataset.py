@@ -25,7 +25,7 @@ class CBISDDSMGenericDataset(Dataset):
         self.transform: Compose = transform
         self.include_masks: bool = masks
         self.current_index: int = 0
-        self.__train_mode: bool = False
+        self.__train_mode: bool = True
         self.__test_mode: bool = False
         self._train_image_transforms: Union[List[torch.nn.Module], Tuple[torch.nn.Module]] = train_image_transform
         self._train_image_transform_for_mask_flags = train_image_transform_for_mask_flags
